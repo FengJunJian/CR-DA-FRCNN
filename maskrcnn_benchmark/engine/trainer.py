@@ -245,3 +245,101 @@ def do_da_train(
             total_time_str, total_training_time / (max_iter)
         )
     )
+
+
+def do_da_sw_train(
+        model,
+        source_data_loader,
+        target_data_loader,
+        optimizer,
+        scheduler,
+        checkpointer,
+        device,
+        checkpoint_period,
+        arguments,
+        cfg,
+):
+    writerT = SummaryWriter(os.path.join(cfg.OUTPUT_DIR, 'even'))
+    logger = logging.getLogger("maskrcnn_benchmark.trainer")
+    logger.info("Start training")
+    meters = MetricLogger(delimiter=" ")
+    max_iter = len(source_data_loader)
+    start_iter = arguments["iteration"]
+    model.train()
+    start_training_time = time.time()
+    end = time.time()
+    for iteration, ((source_images, source_targets, idx1), (target_images, target_targets, idx2)) in enumerate(
+            zip(source_data_loader, target_data_loader), start_iter + 1):
+        data_time = time.time() - end
+        arguments["iteration"] = iteration
+
+        images = (source_images + target_images).to(device)
+        targets = [target.to(device) for target in list(source_targets + target_targets)]
+
+        loss_dict = model(images, targets)  # not use the targets from target domain
+
+        losses = sum(loss for loss in loss_dict.values())
+
+        # reduce losses over all GPUs for logging purposes
+        loss_dict_reduced = reduce_loss_dict(loss_dict)
+        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+        meters.update(loss=losses_reduced, **loss_dict_reduced)
+
+        optimizer.zero_grad()
+        losses.backward()
+        optimizer.step()
+
+        scheduler.step()
+
+        batch_time = time.time() - end
+        end = time.time()
+        meters.update(time=batch_time, data=data_time)
+        meters.update(lr=optimizer.param_groups[0]["lr"])
+
+        if iteration % 20 == 0 or iteration == max_iter:
+            eta_seconds = meters.time.global_avg * (max_iter - iteration)
+            eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
+            for k, v in meters.toDict().items():
+                writerT.add_scalar(tag=k, scalar_value=v, global_step=iteration)
+                writerT.flush()
+            writerT.add_scalar(tag='lr', scalar_value=optimizer.param_groups[0]["lr"], global_step=iteration)
+            print(meters.delimiter.join(
+                [
+                    "eta: {eta}",
+                    "iter: {iter}",
+                    "{meters}",
+                    "lr: {lr:.6f}",
+                    "max mem: {memory:.0f}",
+                ]
+            ).format(
+                eta=eta_string,
+                iter=iteration,
+                meters=str(meters),
+                lr=optimizer.param_groups[0]["lr"],
+                memory=torch.cuda.max_memory_allocated() / 1024.0 / 1024.0,
+            ))
+
+        if iteration % checkpoint_period == 0:
+            checkpointer.save("model_{:07d}".format(iteration), **arguments)
+            testResult = testbbox(cfg, model, str(iteration))  # will call the model.eval()
+            try:
+                for k, v in testResult[0][0].results['bbox'].items():
+                    # print(k,v)
+                    writerT.add_scalar(tag=k, scalar_value=v, global_step=iteration)
+                    writerT.flush()
+            except:
+                print('Error:testResult is empty!')
+            model.train()  # see testbbox function
+        if iteration == max_iter - 1:
+            checkpointer.save("model_final", **arguments)
+        if torch.isnan(losses_reduced).any():
+            logger.critical('Loss is NaN, exiting...')
+            return
+
+    total_training_time = time.time() - start_training_time
+    total_time_str = str(datetime.timedelta(seconds=total_training_time))
+    logger.info(
+        "Total training time: {} ({:.4f} s / it)".format(
+            total_time_str, total_training_time / (max_iter)
+        )
+    )
