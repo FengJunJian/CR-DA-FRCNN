@@ -1,0 +1,2 @@
+python tools/train_net.py --config-file configs/da_ship/da_faster_rcnn_R_50_C4_SS.yaml OUTPUT_DIR ../logSS0 DATASETS.TRAIN ('train_SeaShips0_cocostyle',) MODEL.DOMAIN_ADAPTATION_ON False
+--config-file ../configs/da_ship/da_faster_rcnn_R_50_C4_SS.yaml OUTPUT_DIR ../../logSS0test MODEL.WEIGHT E:\DA\logSS1\model_0002500.pth DATASETS.TRAIN ('train_SeaShips0_cocostyle',) DATASETS.TEST ('test10_cocostyle',) MODEL.DOMAIN_ADAPTATION_ON False
