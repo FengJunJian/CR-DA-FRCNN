@@ -140,8 +140,9 @@ class RPNLossComputation(object):
         box_loss = smooth_l1_loss(
             box_regression[sampled_pos_inds],
             regression_targets[sampled_pos_inds],
+            reduction="sum",
             beta=1.0 / 9,
-            size_average=False,
+            #size_average=False,
         ) / (sampled_inds.numel())
 
         objectness_loss = F.binary_cross_entropy_with_logits( #TODO use focal loss
