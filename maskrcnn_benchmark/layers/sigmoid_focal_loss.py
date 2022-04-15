@@ -70,7 +70,7 @@ class SigmoidFocalLoss(nn.Module):
         #ops.sigmoid_focal_loss()
         #loss = loss_func(logits, targets, self.gamma, self.alpha)#
         loss = loss_func(inputs=logits, targets=targets, alpha=self.alpha,gamma=self.gamma)#pytorch 1.7.0
-        return loss.sum()
+        return loss.mean()
 
     def __repr__(self):
         tmpstr = self.__class__.__name__ + "("
