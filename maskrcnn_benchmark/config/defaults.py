@@ -27,13 +27,28 @@ _C.MODEL.DOMAIN_ADAPTATION_ON =False
 _C.MODEL.RETINANET_ON = False
 _C.MODEL.KEYPOINT_ON = False
 _C.MODEL.DEVICE = "cuda"
-_C.MODEL.META_ARCHITECTURE = "GeneralizedRCNN"
+_C.MODEL.META_ARCHITECTURE = "GeneralizedRCNN"#SW_DA_RCNN
 _C.MODEL.CLS_AGNOSTIC_BBOX_REG = False#类无关回归
 
 # If the WEIGHT starts with a catalog://, like :R-50, the code will look for
 # the path in paths_catalog. Else, it will use it as the specified absolute
 # path
 _C.MODEL.WEIGHT = ""
+# -----------------------------------------------------------------------------
+# Parameters of SW_DA_RCNN
+# -----------------------------------------------------------------------------
+_C.MODEL.SW = CN()
+_C.MODEL.SW.LC=True
+_C.MODEL.SW.GC=True
+_C.MODEL.SW.DA_GRL_WEIGHT=1.0
+_C.MODEL.SW.SW_ROIBoxHead=True
+_C.MODEL.SW_ON=True
+# -----------------------------------------------------------------------------
+# Parameters of ICR_CCR
+# -----------------------------------------------------------------------------
+_C.MODEL.ICR_CCR = CN()
+_C.MODEL.ICR_CCR.DA_GRL_WEIGHT=1.0
+_C.MODEL.ICR_CCR.DA_CCR_WEIGHT=1.0
 
 
 # -----------------------------------------------------------------------------
@@ -71,7 +86,7 @@ _C.DATASETS.TEST = ()
 # -----------------------------------------------------------------------------
 _C.DATALOADER = CN()
 # Number of data loading threads
-_C.DATALOADER.NUM_WORKERS = 16
+_C.DATALOADER.NUM_WORKERS = 2
 # If > 0, this enforces that each collated batch should have a size divisible
 # by SIZE_DIVISIBILITY
 _C.DATALOADER.SIZE_DIVISIBILITY = 0
