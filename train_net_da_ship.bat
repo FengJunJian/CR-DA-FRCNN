@@ -1,5 +1,5 @@
 rem da_faster_rcnn_R_50_C4_SMD2SS########
-rem python tools/train_net.py --config-file configs/da_ship/da_faster_rcnn_R_50_C4_SMD2SS_ship.yaml OUTPUT_DIR ../logSMDToSSship DATASETS.TRAIN ('ship_train_SMD_cocostyle',) DATASETS.SOURCE_TRAIN ('ship_train_SMD_cocostyle',) DATASETS.TARGET_TRAIN ('ship_train_SeaShips_cocostyle',) DATASETS.TEST ('ship_test_SeaShips_cocostyle',) SOLVER.MAX_ITER 20000
+python tools/train_net.py --config-file configs/da_ship/da_faster_rcnn_R_50_C4_SMD2SS_ship.yaml OUTPUT_DIR ../logSMDToSSship DATASETS.TRAIN ('ship_train_SMD_cocostyle',) DATASETS.SOURCE_TRAIN ('ship_train_SMD_cocostyle',) DATASETS.TARGET_TRAIN ('ship_train_SeaShips_cocostyle',) DATASETS.TEST ('ship_test_SeaShips_cocostyle',) SOLVER.MAX_ITER 20000
 python tools/train_net.py --config-file configs/da_ship/da_faster_rcnn_R_50_C4_SMD2SS_ship.yaml OUTPUT_DIR ../logSMDToSS0ship DATASETS.TRAIN ('ship_train_SMD_cocostyle',) DATASETS.SOURCE_TRAIN ('ship_train_SMD_cocostyle',) DATASETS.TARGET_TRAIN ('ship_train_SeaShips0_cocostyle',) DATASETS.TEST ('ship_test_SeaShips_cocostyle',) SOLVER.MAX_ITER 20000
 python tools/train_net.py --config-file configs/da_ship/da_faster_rcnn_R_50_C4_SMD2SS_ship.yaml OUTPUT_DIR ../logSMDToSS3ship DATASETS.TRAIN ('ship_train_SMD_cocostyle',) DATASETS.SOURCE_TRAIN ('ship_train_SMD_cocostyle',) DATASETS.TARGET_TRAIN ('ship_train_SeaShips3_cocostyle',) DATASETS.TEST ('ship_test_SeaShips_cocostyle',) SOLVER.MAX_ITER 20000
 
@@ -13,7 +13,7 @@ python tools/train_net.py --config-file configs/da_ship/da_faster_rcnn_R_50_C4_S
 
 
 rem da_faster_rcnn_R_50_C4_SS2SMD########
-rem python tools/train_net.py --config-file configs/da_ship/da_faster_rcnn_R_50_C4_SS2SMD_ship.yaml OUTPUT_DIR ../logSSToSMDship DATASETS.TRAIN ('ship_train_SeaShips_cocostyle',) DATASETS.SOURCE_TRAIN ('ship_train_SeaShips_cocostyle',) DATASETS.TARGET_TRAIN ('ship_train_SMD_cocostyle',) DATASETS.TEST ('ship_test_SMD_cocostyle',) SOLVER.MAX_ITER 20000
+python tools/train_net.py --config-file configs/da_ship/da_faster_rcnn_R_50_C4_SS2SMD_ship.yaml OUTPUT_DIR ../logSSToSMDship DATASETS.TRAIN ('ship_train_SeaShips_cocostyle',) DATASETS.SOURCE_TRAIN ('ship_train_SeaShips_cocostyle',) DATASETS.TARGET_TRAIN ('ship_train_SMD_cocostyle',) DATASETS.TEST ('ship_test_SMD_cocostyle',) SOLVER.MAX_ITER 20000
 python tools/train_net.py --config-file configs/da_ship/da_faster_rcnn_R_50_C4_SS2SMD_ship.yaml OUTPUT_DIR ../logSSToSMD0ship DATASETS.TRAIN ('ship_train_SeaShips_cocostyle',) DATASETS.SOURCE_TRAIN ('ship_train_SeaShips_cocostyle',) DATASETS.TARGET_TRAIN ('ship_train_SMD0_cocostyle',) DATASETS.TEST ('ship_test_SMD_cocostyle',) SOLVER.MAX_ITER 20000
 python tools/train_net.py --config-file configs/da_ship/da_faster_rcnn_R_50_C4_SS2SMD_ship.yaml OUTPUT_DIR ../logSSToSMD3ship DATASETS.TRAIN ('ship_train_SeaShips_cocostyle',) DATASETS.SOURCE_TRAIN ('ship_train_SeaShips_cocostyle',) DATASETS.TARGET_TRAIN ('ship_train_SMD3_cocostyle',) DATASETS.TEST ('ship_test_SMD_cocostyle',) SOLVER.MAX_ITER 20000
 
