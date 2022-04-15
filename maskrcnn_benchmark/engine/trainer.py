@@ -273,10 +273,11 @@ def do_da_sw_train(
         data_time = time.time() - end
         arguments["iteration"] = iteration
 
-        images = (source_images + target_images).to(device)
-        targets = [target.to(device) for target in list(source_targets + target_targets)]
+        images = (source_images + target_images).to(device)#[2,3,608,1088]
+        targets = [target.to(device) for target in list(source_targets + target_targets)]#source domain label:1
+        # target domain label:0
 
-        loss_dict = model(images, targets)  # not use the targets from target domain
+        loss_dict = model(images, targets) # # not use the targets from target domain
 
         losses = sum(loss for loss in loss_dict.values())
 
