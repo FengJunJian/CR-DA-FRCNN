@@ -26,9 +26,19 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
     loaded_keys = sorted(list(loaded_state_dict.keys()))
     # get a matrix of string matches, where each (i, j) entry correspond to the size of the
     # loaded_key string, if it matches
-    match_matrix = [
-        len(j) if i.endswith(j) else 0 for i in current_keys for j in loaded_keys
-    ]
+    match_matrix = []
+
+    for i in current_keys:
+        for j in loaded_keys:
+            if i.endswith(j) and not i.startswith("da_heads"):
+                match_matrix.append(len(j))
+            else:
+                match_matrix.append(0)
+
+
+    # match_matrix = [
+    #     len(j) if i.endswith(j) else 0 for i in current_keys for j in loaded_keys
+    # ]
     match_matrix = torch.as_tensor(match_matrix).view(
         len(current_keys), len(loaded_keys)
     )
