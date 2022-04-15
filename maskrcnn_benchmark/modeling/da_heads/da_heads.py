@@ -250,8 +250,7 @@ class SWDomainModule(torch.nn.Module):
                 label_i = cls_pre_label[target_ins_ind].item()
                 if label_i > 0:
                     diff_value = torch.exp(
-                        self.cfg.MODEL.ICR_CCR.DA_CCR_WEIGHT
-                        * torch.abs(cls_feat_sig[label_i - 1] - cls_prob[target_ins_ind][label_i])
+                        torch.abs(cls_feat_sig[label_i - 1] - cls_prob[target_ins_ind][label_i])
                     ).item()#compute the weight
                     source_target_weight.append(diff_value)
                 else:
@@ -267,11 +266,11 @@ class SWDomainModule(torch.nn.Module):
             # nn.BCELoss()(da_ins_features_sigmoid, da_ins_labels.view(da_ins_features.size(0),-1).float().to(self.cfg.MODEL.DEVICE))
             # F.binary_cross_entropy_with_logits(da_ins_features_sigmoid, da_ins_labels.view(da_ins_features.size(0),-1).float().to(self.cfg.MODEL.DEVICE))
             losses = {}
-            losses["ICR_loss"]=ICR_loss
+            losses["ICR_loss"]=ICR_loss*self.cfg.MODEL.ICR_CCR.ICR_WEIGHT
             # if self.img_weight > 0:
             #     losses["loss_da_image"] = self.img_weight * da_img_loss
             #if self.ins_weight > 0:
-            losses["CCR_loss"] =  CCR_loss
+            losses["CCR_loss"] =  CCR_loss*self.cfg.MODEL.ICR_CCR.CCR_WEIGHT
             # if self.cst_weight > 0:
             #     losses["loss_da_consistency"] = self.cst_weight * da_consistency_loss
             return losses
@@ -321,25 +320,22 @@ class SWDomainModule(torch.nn.Module):
             domain_p = self.netD(SW_netDInputFeatures)#全局特征对齐
 
         # SW loss
-
-        # pixeldomain_labels=torch.reshape(domain_labels,(batch,1,1,-1))
         pixeldomain_labels=domain_labels.view(batch,1,1,-1)
         pixeldomain_labels=pixeldomain_labels.expand(d_pixel.size())#.to(self.cfg.MODEL.DEVICE)
         SLloss=0.5*torch.where(pixeldomain_labels,torch.mean(d_pixel ** 2),torch.mean((1 - d_pixel) ** 2))
-
         #SLloss = 0.5 *(torch.mean(d_pixel ** 2))
                        #0.5 * torch.mean((1 - out_d_pixel) ** 2)) # local Strong loss
-        # domain_t = torch.ones(out_d.size(0)).long().cuda()
+
         domain_p_target=torch.zeros(domain_p.size(),dtype=torch.int64,device=self.cfg.MODEL.DEVICE)
         domain_p_target.scatter_(1,domain_labels.view(batch,1).long(),1)#one-hot for domain label
         WGloss = self.sigmoid_focal_loss(domain_p, domain_p_target.float())  # global Weak loss
 
+        ####
         SWlosses = {}
-        SWlosses["SLloss"] = SLloss.mean()
-        SWlosses["WGloss"] = WGloss
+        SWlosses["SLloss"] = SLloss.mean()*self.cfg.MODEL.SW.SW_WEIGHT
+        SWlosses["WGloss"] = WGloss**self.cfg.MODEL.SW.SW_WEIGHT
         return d_pixel,feat_pixel,domain_p,feat,SWlosses
         ############################################################################################
-
 
 def conv3x3(in_planes, out_planes, stride=1):
     "3x3 convolution with padding"
@@ -378,8 +374,6 @@ class netD_pixel(nn.Module):
         normal_init(self.conv3, 0, 0.01)
 
     def forward(self, x):
-        # if flagGRL:
-        #     x=gradient_scalar(x,-1.0*self.cfg.MODEL.SW.DA_GRL_WEIGHT)
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         if self.context:
@@ -426,8 +420,6 @@ class netD(nn.Module):
         normal_init(self.fc, 0, 0.01)
 
     def forward(self, x):
-        # if flagGRL:
-        #     x=gradient_scalar(x,-1.0*self.cfg.MODEL.SW.DA_GRL_WEIGHT)
         x = F.dropout(F.relu(self.bn1(self.conv1(x))), training=self.training)
         x = F.dropout(F.relu(self.bn2(self.conv2(x))), training=self.training)
         x = F.dropout(F.relu(self.bn3(self.conv3(x))), training=self.training)
