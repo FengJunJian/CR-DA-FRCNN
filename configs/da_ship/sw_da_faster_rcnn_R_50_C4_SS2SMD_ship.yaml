@@ -27,10 +27,10 @@ MODEL:
 DATALOADER:
   SIZE_DIVISIBILITY: 32
 DATASETS:
-  TRAIN: ("ship_train_SMD_cocostyle",)
-  SOURCE_TRAIN: ("ship_train_SMD_cocostyle",)
-  TARGET_TRAIN: ("ship_train_SeaShips_cocostyle",)
-  TEST: ("ship_test_SeaShips_cocostyle",)
+  TRAIN: ("ship_train_SeaShips_cocostyle",)
+  SOURCE_TRAIN: ("ship_train_SeaShips_cocostyle",)
+  TARGET_TRAIN: ("ship_train_SMD_cocostyle",)
+  TEST: ("ship_test_SMD_cocostyle",)
 INPUT:
   MIN_SIZE_TRAIN: (600,)
   MAX_SIZE_TRAIN: 1200
