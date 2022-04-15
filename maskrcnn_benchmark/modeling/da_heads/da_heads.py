@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch import nn
 from maskrcnn_benchmark.layers import GradientScalarLayer
 # from maskrcnn_benchmark.layers.gradient_scalar_layer import gradient_scalar
-from layers.sigmoid_focal_loss import SigmoidFocalLoss
+from maskrcnn_benchmark.layers.sigmoid_focal_loss import SigmoidFocalLoss
 from .loss import make_da_heads_loss_evaluator
 
 class DAImgHead(nn.Module):
