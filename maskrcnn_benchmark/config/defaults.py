@@ -41,6 +41,7 @@ _C.MODEL.SW = CN()
 _C.MODEL.SW.LC=True
 _C.MODEL.SW.GC=True
 _C.MODEL.SW.DA_GRL_WEIGHT=1.0
+_C.MODEL.SW.SW_WEIGHT=1.0
 _C.MODEL.SW.SW_ROIBoxHead=True
 _C.MODEL.SW_ON=True
 # -----------------------------------------------------------------------------
@@ -48,8 +49,8 @@ _C.MODEL.SW_ON=True
 # -----------------------------------------------------------------------------
 _C.MODEL.ICR_CCR = CN()
 _C.MODEL.ICR_CCR.DA_GRL_WEIGHT=1.0
-_C.MODEL.ICR_CCR.DA_CCR_WEIGHT=1.0
-
+_C.MODEL.ICR_CCR.CCR_WEIGHT=1.0
+_C.MODEL.ICR_CCR.ICR_WEIGHT=1.0
 
 # -----------------------------------------------------------------------------
 # INPUT
