@@ -38,10 +38,12 @@ class ResNet50Conv5ROIFeatureExtractor(nn.Module):#default
 
         self.pooler = pooler
         self.head = head
+        self.avgpool = nn.AvgPool2d(kernel_size=7, stride=7)
 
     def forward(self, x, proposals):
         x = self.pooler(x, proposals)
         x = self.head(x)
+        x = self.avgpool(x)
         return x
 
     # def featureROI(self, x, proposals):
