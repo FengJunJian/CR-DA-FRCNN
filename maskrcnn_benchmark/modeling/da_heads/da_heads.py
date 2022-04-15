@@ -196,7 +196,8 @@ class SWDomainModule(torch.nn.Module):
             cfg.MODEL.RETINANET.LOSS_ALPHA
         )
         #self.loss_evaluator = make_da_heads_loss_evaluator(cfg)
-    def forwardCR(self, img_features2, pooled_feat, class_logits,da_ins_labels, targets=None):
+
+    def forwardCR(self, img_features2, flattenpooled_feat, class_logits,da_ins_labels, targets=None):
         """
         Arguments:
             img_features (list[Tensor]): features computed from the images that are
@@ -211,48 +212,66 @@ class SWDomainModule(torch.nn.Module):
         """
         ############################################################################################
         img_features2=img_features2[0]
+        #batch_size=img_features2.size(0)
         ICR_feat = self.AdaAvg_pool(img_features2)
         ICR_feat = self.conv_ICR(ICR_feat).squeeze(-1).squeeze(-1)
         # cls_feat = self.conv_lst(self.bn1(self.avg_pool(base_feat))).squeeze(-1).squeeze(-1)
 
-        ICR_CCR_InsFeatures = [self.grl_ICR_CCR(fea) for fea in pooled_feat]
+        # ICR_CCR_InsFeatures = [self.grl_ICR_CCR(fea) for fea in flattenpooled_feat]
+        ICR_CCR_InsFeatures = self.grl_ICR_CCR(flattenpooled_feat)
 
         da_ins_features = self.insHead(ICR_CCR_InsFeatures)
 
         if self.training:
-            # Image-level categorical regularization (ICR) loss
-            ICR_loss = nn.BCEWithLogitsLoss()(ICR_feat, targets)
+            domain_labels = torch.tensor([t.get_field('is_source').any() for t in targets]).to(self.cfg.MODEL.DEVICE)
+            source_mask=domain_labels#source domain label:1
+            source_inds=torch.where(source_mask==1)[0]
+            #target_inds = torch.where(source_mask == 0)[0]
 
-            # compute categorical consistency regularization (CCR) loss
+            im_cls_lb = torch.zeros((source_inds.size(0), self.cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES -1),
+                                    dtype=ICR_feat.dtype,device=ICR_feat.device)
+            for i, s in enumerate(source_inds):
+                gt_classes = targets[s].get_field('labels')
+                im_cls_lb[i][gt_classes - 1] = 1
+
+            # Image-level categorical regularization (ICR) loss
+            ICR_loss = nn.BCEWithLogitsLoss()(ICR_feat[source_inds] , im_cls_lb)#would be useless for two class detection
+
+            # compute categorical consistency regularization (CCR) loss for instances
             cls_prob = torch.softmax(class_logits, 1)
             cls_pre_label = cls_prob.argmax(1).detach()
-            cls_feat_sig = torch.sigmoid(ICR_feat[0]).detach()
-            target_weight = []
-            for i in range(len(cls_pre_label)):
-                label_i = cls_pre_label[i].item()
+            cls_feat_sig = torch.sigmoid(ICR_feat).detach()
+            source_ins_inds=torch.where(da_ins_labels)[0]
+            target_ins_inds = torch.where(torch.logical_not(da_ins_labels))[0]
+            source_weight=[1.0]*len(source_ins_inds)
+            source_target_weight = []
+            source_target_weight.extend(source_weight)
+            for j,target_ins_ind in enumerate(target_ins_inds):
+                label_i = cls_pre_label[target_ins_ind].item()
                 if label_i > 0:
                     diff_value = torch.exp(
                         self.cfg.MODEL.ICR_CCR.DA_CCR_WEIGHT
-                        * torch.abs(cls_feat_sig[label_i - 1] - cls_prob[i][label_i])
-                    ).item()
-                    target_weight.append(diff_value)
+                        * torch.abs(cls_feat_sig[label_i - 1] - cls_prob[target_ins_ind][label_i])
+                    ).item()#compute the weight
+                    source_target_weight.append(diff_value)
                 else:
-                    target_weight.append(1.0)
-
+                    source_target_weight.append(1.0)
+            #F.binary_cross_entropy()
             instance_loss = nn.BCELoss(
-                weight=torch.Tensor(target_weight).view(-1, 1).cuda()
+                weight=torch.Tensor(source_target_weight).view(-1, 1).cuda()
             )
             # else:
             #     instance_loss = nn.BCELoss()
-            da_ins_loss_cls = instance_loss(da_ins_features, da_ins_labels)
-
-
+            da_ins_features_sigmoid = torch.sigmoid(da_ins_features)
+            CCR_loss = instance_loss(da_ins_features_sigmoid, da_ins_labels.float().view(da_ins_features.size(0),-1).to(da_ins_features_sigmoid.device))
+            # nn.BCELoss()(da_ins_features_sigmoid, da_ins_labels.view(da_ins_features.size(0),-1).float().to(self.cfg.MODEL.DEVICE))
+            # F.binary_cross_entropy_with_logits(da_ins_features_sigmoid, da_ins_labels.view(da_ins_features.size(0),-1).float().to(self.cfg.MODEL.DEVICE))
             losses = {}
             losses["ICR_loss"]=ICR_loss
             # if self.img_weight > 0:
             #     losses["loss_da_image"] = self.img_weight * da_img_loss
             #if self.ins_weight > 0:
-            losses["loss_da_instance"] =  da_ins_loss_cls
+            losses["CCR_loss"] =  CCR_loss
             # if self.cst_weight > 0:
             #     losses["loss_da_consistency"] = self.cst_weight * da_consistency_loss
             return losses
@@ -303,7 +322,8 @@ class SWDomainModule(torch.nn.Module):
 
         # SW loss
 
-        pixeldomain_labels=torch.reshape(domain_labels,(batch,1,1,-1))
+        # pixeldomain_labels=torch.reshape(domain_labels,(batch,1,1,-1))
+        pixeldomain_labels=domain_labels.view(batch,1,1,-1)
         pixeldomain_labels=pixeldomain_labels.expand(d_pixel.size())#.to(self.cfg.MODEL.DEVICE)
         SLloss=0.5*torch.where(pixeldomain_labels,torch.mean(d_pixel ** 2),torch.mean((1 - d_pixel) ** 2))
 
