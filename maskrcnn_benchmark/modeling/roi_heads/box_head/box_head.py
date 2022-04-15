@@ -114,7 +114,7 @@ class SW_ROIBoxHead(ROIBoxHead):
         self.gc = cfg.MODEL.SW.GC
         self.avgpool = nn.AvgPool2d(kernel_size=7, stride=7)
 
-    def forward_predict(self, avgpooled_feat, proposals, feat_local=None,feat_global=None,targets=None):
+    def forward_predict(self, features,flattenpooled_feat, proposals, feat_local=None,feat_global=None,targets=None):
         """
         Arguments:
             features (list[Tensor]): feature-maps from possibly several levels
@@ -139,28 +139,29 @@ class SW_ROIBoxHead(ROIBoxHead):
         # # feature_extractor generally corresponds to the pooler + heads
         # pooled_feat = self.feature_extractor(features, proposals)#ROIPooling
         batch_size=len(proposals)
+
         #SW-DA-FRCNN
         if self.lc:
-            feat_pixel = torch.repeat_interleave(feat_local.view(batch_size, -1),torch.tensor(avgpooled_feat.size(0)/batch_size,dtype=int,device=feat_local.device),dim=0)
-            avgpooled_feat = torch.cat((feat_pixel, avgpooled_feat), 1)
+            feat_pixel = torch.repeat_interleave(feat_local.view(batch_size, -1),torch.tensor(flattenpooled_feat.size(0)/batch_size,dtype=torch.long,device=feat_local.device),dim=0)
+            flattenpooled_feat = torch.cat((feat_pixel, flattenpooled_feat), 1)
             #if self.da_use_contex:
             # instance_pooled_feat = torch.cat(
             #     (feat_pixel.detach(), pooled_feat), 1
             # )
         if self.gc:
-            feat = feat_global.view(batch_size, -1).repeat(avgpooled_feat.size(0), 1)
-            avgpooled_feat = torch.cat((feat, avgpooled_feat), 1)
+            feat = torch.repeat_interleave(feat_global.view(batch_size, -1),torch.tensor(flattenpooled_feat.size(0)/batch_size,dtype=torch.long,device=feat_local.device),dim=0)#.repeat(avgpooled_feat.size(0), 1)
+            flattenpooled_feat = torch.cat((feat, flattenpooled_feat), 1)
             # if self.da_use_contex:
             # instance_pooled_feat = torch.cat(
             #     (feat.detach(), instance_pooled_feat), 1
             # )
 
         # final classifier that converts the features into predictions
-        class_logits, box_regression = self.predictor(avgpooled_feat)
+        class_logits, box_regression = self.predictor(flattenpooled_feat)
 
         if not self.training:
             result = self.post_processor((class_logits, box_regression), proposals)
-            return avgpooled_feat, result, {}, avgpooled_feat, None,None
+            return flattenpooled_feat, result, {}, flattenpooled_feat, None,None
 
 
         loss_classifier, loss_box_reg, _ = self.loss_evaluator(
@@ -171,13 +172,13 @@ class SW_ROIBoxHead(ROIBoxHead):
             with torch.no_grad():
                 da_proposals = self.loss_evaluator.subsample_for_da(proposals, targets)
         da_ins_labels = cat([proposal.get_field("domain_labels") for proposal in da_proposals], dim=0).bool()
-        da_ins_feas = self.feature_extractor(avgpooled_feat, da_proposals)# features of instances
+        da_ins_feas = self.feature_extractor(features, da_proposals)# features of instances
         # class_logits, box_regression = self.predictor(da_ins_feas)
         # _, _, da_ins_labels = self.loss_evaluator(
         #     [class_logits], [box_regression]
         # )
         return (
-            avgpooled_feat,
+            flattenpooled_feat,
             proposals,
             dict(loss_classifier=loss_classifier, loss_box_reg=loss_box_reg),
             da_ins_feas,
@@ -207,10 +208,10 @@ class SW_ROIBoxHead(ROIBoxHead):
 
         # extract features that will be fed to the final classifier. The
         # feature_extractor generally corresponds to the pooler + heads
-        avgpooled_feat = self.feature_extractor(features, proposals)#ROIPooling
+        flattenpooled_feat = self.feature_extractor(features, proposals)#ROIPooling
 
         return (
-            avgpooled_feat,
+            flattenpooled_feat,
             proposals,
         )
     def featureROI(self, features, targets):
