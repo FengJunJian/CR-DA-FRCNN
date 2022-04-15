@@ -231,13 +231,13 @@ class SW_DA_RCNN(GeneralizedRCNN):
         proposals, proposal_losses = self.rpn(images, features2, targets)#proposals：[BoxList(num_boxes=1000, image_width=1066, image_height=600, mode=xyxy)]
         da_losses = {}
         if self.roi_heads and self.da_heads:
-            avgpooled_feat, proposals=self.roi_heads.box.forward_pooled_feat(features2, proposals, targets)#获取
+            flattenpooled_feat, proposals=self.roi_heads.box.forward_pooled_feat(features2, proposals, targets)#获取
             d_pixel,feat_pixel,domain_p,feat,SW_loss=self.da_heads.forwardSW(features1, features2,targets)
             da_losses.update(SW_loss)
 
             x, result, detector_losses, da_ins_feas, da_ins_labels, class_logits= \
-                self.roi_heads.box.forward_predict(avgpooled_feat, proposals,feat_local=feat_pixel,feat_global=feat,targets=targets)
-            CR_losses = self.da_heads.forwardCR(features2, avgpooled_feat, class_logits, da_ins_labels, targets)
+                self.roi_heads.box.forward_predict(features2,flattenpooled_feat, proposals,feat_local=feat_pixel,feat_global=feat,targets=targets)
+            CR_losses = self.da_heads.forwardCR(features2, x, class_logits, da_ins_labels, targets)
 
             da_losses.update(CR_losses)
             #img_features2, pooled_feat, class_logits, da_ins_labels,
