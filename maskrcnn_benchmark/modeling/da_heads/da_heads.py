@@ -434,8 +434,6 @@ class netD(nn.Module):
             return x
 
 
-
-
 def build_da_heads(cfg):
     if cfg.MODEL.SW_ON:
         return SWDomainModule(cfg)

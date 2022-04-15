@@ -57,7 +57,8 @@ def train(cfg, local_rank, distributed):
 
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
 
-    if cfg.MODEL.DOMAIN_ADAPTATION_ON:#SW-DA-FRCNN
+    #if cfg.MODEL.DOMAIN_ADAPTATION_ON:#SW-DA-FRCNN
+    if cfg.MODEL.SW_ON:  # SW-DA-FRCNN
         source_data_loader = make_data_loader(
             cfg,
             is_train=True,
@@ -74,6 +75,34 @@ def train(cfg, local_rank, distributed):
         )
 
         do_da_sw_train(
+            model,
+            source_data_loader,
+            target_data_loader,
+            optimizer,
+            scheduler,
+            checkpointer,
+            device,
+            checkpoint_period,
+            arguments,
+            cfg,
+        )
+    elif cfg.MODEL.DOMAIN_ADAPTATION_ON:
+        source_data_loader = make_data_loader(
+            cfg,
+            is_train=True,
+            is_source=True,
+            is_distributed=distributed,
+            start_iter=arguments["iteration"],
+        )
+        target_data_loader = make_data_loader(
+            cfg,
+            is_train=True,
+            is_source=False,
+            is_distributed=distributed,
+            start_iter=arguments["iteration"],
+        )
+
+        do_da_train(
             model,
             source_data_loader,
             target_data_loader,
