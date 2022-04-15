@@ -11,16 +11,11 @@ class FastRCNNPredictor(nn.Module):
         stage_index = 4
         stage2_relative_factor = 2 ** (stage_index - 1)
         res2_out_channels = config.MODEL.RESNETS.RES2_OUT_CHANNELS
-
         num_inputs = res2_out_channels * stage2_relative_factor
-        ### reference to SW-DA-FRCNN
-        if config.MODEL.SW.LC:
-            num_inputs += 128
-        if config.MODEL.SW.GC:
-            num_inputs += 128
+
         num_classes = config.MODEL.ROI_BOX_HEAD.NUM_CLASSES
-        #self.avgpool = nn.AvgPool2d(kernel_size=7, stride=7)
-        self.cls_score = nn.Linear(num_inputs, num_classes)#2048+128+128=2304
+        self.avgpool = nn.AvgPool2d(kernel_size=7, stride=7)
+        self.cls_score = nn.Linear(num_inputs, num_classes)
         num_bbox_reg_classes = 2 if config.MODEL.CLS_AGNOSTIC_BBOX_REG else num_classes
         self.bbox_pred = nn.Linear(num_inputs, num_bbox_reg_classes * 4)
 
@@ -31,7 +26,7 @@ class FastRCNNPredictor(nn.Module):
         nn.init.constant_(self.bbox_pred.bias, 0)
 
     def forward(self, x):
-        #x = self.avgpool(x)
+        x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         cls_logit = self.cls_score(x)
         bbox_pred = self.bbox_pred(x)
