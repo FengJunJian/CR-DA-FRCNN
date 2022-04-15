@@ -54,6 +54,7 @@ class CombinedROIHeads(torch.nn.ModuleDict):
             losses.update(loss_keypoint)
         return x, detections, losses, da_ins_feas, da_ins_labels
 
+
     # def featureROI(self, features, proposals, targets=None):
     #     '''
     #     Only test for box detection
