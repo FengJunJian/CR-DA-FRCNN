@@ -237,9 +237,9 @@ class SW_DA_RCNN(GeneralizedRCNN):
 
             x, result, detector_losses, da_ins_feas, da_ins_labels, class_logits= \
                 self.roi_heads.box.forward_predict(features2,flattenpooled_feat, proposals,feat_local=feat_pixel,feat_global=feat,targets=targets)
-            CR_losses = self.da_heads.forwardCR(features2, x, class_logits, da_ins_labels, targets)
-
-            da_losses.update(CR_losses)
+            # CR_losses = self.da_heads.forwardCR(features2, x, class_logits, da_ins_labels, targets)
+            #
+            # da_losses.update(CR_losses)
             #img_features2, pooled_feat, class_logits, da_ins_labels,
             #x:[1000, 2048, 7, 7], da_ins_feas:[1000, 2048, 7, 7]
 

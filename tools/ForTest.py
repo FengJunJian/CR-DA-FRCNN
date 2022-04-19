@@ -72,15 +72,15 @@ def testbbox(cfg, model, numstr='', distributed=False,flagVisual=False):
 
         if flagVisual:
             predictions = torch.load(os.path.join(output_folder, 'predictions.pth'))
-            saveImgPath = os.path.join(output_folder, 'img')
+            saveImgPath = os.path.join(output_folder, 'imgS')
             if not os.path.exists(saveImgPath):
                 os.mkdir(saveImgPath)
-            visualization(predictions, data_loader_val.dataset, saveImgPath,cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES, 0.95)
+            visualization(predictions, data_loader_val.dataset, saveImgPath,cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES, 0.1,showScore=True)
         synchronize()
     return results
 
 
-def visualization(predictions,dataset,output_folder,num_color,threshold=0.5):#threshold=0.1,iou_type="bbox"
+def visualization(predictions,dataset,output_folder,num_color,threshold=0.5,showScore=False):#threshold=0.1,iou_type="bbox"
     #num_color = cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES
     hsv_tuples = [(x / num_color, 1., 1.)
                   for x in range(num_color)]
@@ -94,12 +94,13 @@ def visualization(predictions,dataset,output_folder,num_color,threshold=0.5):#th
     for k,v in dataset.coco.cats.items():
         CLASS_NAMES[k]=v['name']
 
-    def write_detection(im, dets,thiness=5,GT_color=None):
+    def write_detection(im, dets,thiness=5,GT_color=None,show_score=False):
+        H,W,C=im.shape
         for i in range(len(dets)):
             rectangle_tmp = im.copy()
             bbox = dets[i, :4].astype(np.int32)
             class_ind = int(dets[i, 4])
-            if class_ind==7:
+            if class_ind==7:#ignore flying
                 continue
             # score = dets[i, -1]
             if GT_color:
@@ -108,6 +109,9 @@ def visualization(predictions,dataset,output_folder,num_color,threshold=0.5):#th
                 color=colors[class_ind]
 
             string = CLASS_NAMES[class_ind]
+            if show_score:
+                string+='%.4f'%(dets[i,5])
+
             # string = '%s' % (CLASSES[class_ind])
             fontFace = cv2.FONT_HERSHEY_COMPLEX
             fontScale = 1.5
@@ -116,12 +120,19 @@ def visualization(predictions,dataset,output_folder,num_color,threshold=0.5):#th
             text_size, baseline = cv2.getTextSize(string, fontFace, fontScale, thiness)
             text_origin = (bbox[0]-1, bbox[1])  # - text_size[1]
         ###########################################putText
-            cv2.rectangle(rectangle_tmp, (text_origin[0] - 1, text_origin[1] + 1),
-                               (text_origin[0] + text_size[0] + 1, text_origin[1] - text_size[1] - 2),
+            p1=[text_origin[0] - 1, text_origin[1] + 1]
+            p2=[text_origin[0] + text_size[0] + 1,text_origin[1] - text_size[1] - 2]
+            if p2[0]>W:
+                dw=p2[0]-W
+                p2[0]-=dw
+                p1[0]-=dw
+
+            rectangle_tmp=cv2.rectangle(rectangle_tmp, (p1[0], p1[1]),
+                               (p2[0], p2[1]),
                                color, cv2.FILLED)
             cv2.addWeighted(im, 0.7, rectangle_tmp, 0.3, 0, im)
             im = cv2.rectangle(im, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, thiness)
-            im = cv2.putText(im, string, text_origin,
+            im = cv2.putText(im, string, (p1[0]+1,p1[1]-1),
                              fontFace, fontScale, (0, 0, 0), thiness,lineType=-1)
         return im
     #coco_results = []
@@ -169,7 +180,7 @@ def visualization(predictions,dataset,output_folder,num_color,threshold=0.5):#th
         dets=dets[inds,:]
         inds=np.where(dets[:,5]>0)[0]#scores>threshold
         dets=dets[inds,:]
-        im=write_detection(im,dets,thiness=2)
+        im=write_detection(im,dets,thiness=2,show_score=showScore)
         #im=write_detection(im,gts,(0,0,255),thiness=2)
         #cv2.imshow('b',im)
         cv2.imwrite(os.path.join(output_folder,img_info['file_name']),im)

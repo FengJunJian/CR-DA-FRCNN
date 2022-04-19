@@ -11,7 +11,8 @@ from . import datasets as D
 from . import samplers
 
 from .collate_batch import BatchCollator
-from .transforms import build_transforms
+from .transforms import build_transforms,build_transforms_edge
+
 # import torchvision.transforms as T
 
 def build_dataset(dataset_list, transforms, dataset_catalog, is_train=True, is_source=True):
@@ -165,8 +166,11 @@ def make_data_loader(cfg, is_train=True, is_source=True, is_distributed=False, s
     else:
         dataset_list = cfg.DATASETS.TEST
 
+    if cfg.MODEL.SW.TRANSFROM_EDGE:
+        transforms = build_transforms_edge(cfg, is_train)  # preprocessing
+    else:
+        transforms = build_transforms(cfg, is_train)#preprocessing
 
-    transforms = build_transforms(cfg, is_train)#preprocessing
     datasets = build_dataset(dataset_list, transforms, DatasetCatalog, is_train, is_source)
 
     data_loaders = []
@@ -182,7 +186,7 @@ def make_data_loader(cfg, is_train=True, is_source=True, is_distributed=False, s
             num_workers=num_workers,
             batch_sampler=batch_sampler,
             collate_fn=collator,
-            prefetch_factor=3,
+            prefetch_factor=2,
         )
         data_loaders.append(data_loader)
     if is_train:

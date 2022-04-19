@@ -296,7 +296,6 @@ class SWDomainModule(torch.nn.Module):
 
         ############################################################################################
         batch=img_features1.shape[0]
-        domain_labels=torch.tensor([t.get_field('is_source').any() for t in targets]).to(self.cfg.MODEL.DEVICE)
 
         SW_netD_pixelInputFeatures = self.grl_SW(img_features1)
         feat_pixel=None
@@ -319,22 +318,27 @@ class SWDomainModule(torch.nn.Module):
         else:
             domain_p = self.netD(SW_netDInputFeatures)#全局特征对齐
 
-        # SW loss
-        pixeldomain_labels=domain_labels.view(batch,1,1,-1)
-        pixeldomain_labels=pixeldomain_labels.expand(d_pixel.size())#.to(self.cfg.MODEL.DEVICE)
-        SLloss=0.5*torch.where(pixeldomain_labels,torch.mean(d_pixel ** 2),torch.mean((1 - d_pixel) ** 2))
-        #SLloss = 0.5 *(torch.mean(d_pixel ** 2))
-                       #0.5 * torch.mean((1 - out_d_pixel) ** 2)) # local Strong loss
+        if self.training:
+            domain_labels = torch.tensor([t.get_field('is_source').any() for t in targets]).to(self.cfg.MODEL.DEVICE)
+            # SW loss
+            pixeldomain_labels=domain_labels.view(batch,1,1,-1)
+            pixeldomain_labels=pixeldomain_labels.expand(d_pixel.size())#.to(self.cfg.MODEL.DEVICE)
+            #SLloss=0.5*torch.where(pixeldomain_labels,torch.mean(d_pixel ** 2),torch.mean((1 - d_pixel) ** 2))
+            SLloss = torch.where(pixeldomain_labels, d_pixel ** 2, (1 - d_pixel) ** 2)
 
-        domain_p_target=torch.zeros(domain_p.size(),dtype=torch.int64,device=self.cfg.MODEL.DEVICE)
-        domain_p_target.scatter_(1,domain_labels.view(batch,1).long(),1)#one-hot for domain label
-        WGloss = self.sigmoid_focal_loss(domain_p, domain_p_target.float())  # global Weak loss
+            #SLloss = 0.5 *(torch.mean(d_pixel ** 2))
+                           #0.5 * torch.mean((1 - out_d_pixel) ** 2)) # local Strong loss
 
-        ####
-        SWlosses = {}
-        SWlosses["SLloss"] = SLloss.mean()*self.cfg.MODEL.SW.SW_WEIGHT
-        SWlosses["WGloss"] = WGloss**self.cfg.MODEL.SW.SW_WEIGHT
-        return d_pixel,feat_pixel,domain_p,feat,SWlosses
+            domain_p_target=torch.zeros(domain_p.size(),dtype=torch.int64,device=self.cfg.MODEL.DEVICE)
+            domain_p_target.scatter_(1,domain_labels.view(batch,1).long(),1)#one-hot for domain label
+            WGloss = self.sigmoid_focal_loss(domain_p, domain_p_target.float())  # global Weak loss
+
+            ####
+            SWlosses = {}
+            SWlosses["SLloss"] = SLloss.mean()*self.cfg.MODEL.SW.SW_WEIGHT
+            SWlosses["WGloss"] = WGloss*self.cfg.MODEL.SW.SW_WEIGHT
+            return d_pixel,feat_pixel,domain_p,feat,SWlosses
+        return d_pixel,feat_pixel,domain_p,feat, {}
         ############################################################################################
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -394,7 +398,7 @@ class netD(nn.Module):
         self.bn2 = nn.BatchNorm2d(128)
         self.conv3 = conv3x3(128, 128, stride=2)
         self.bn3 = nn.BatchNorm2d(128)
-        self.fc = nn.Linear(128, 2)
+        self.fc = nn.Linear(128, 2,bias=False)
         self.context = context
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
         self.cfg=cfg

@@ -105,12 +105,15 @@ def do_coco_evaluation(
         with open(os.path.join(output_folder,"coco_PR"),'wb') as f:
             plk.dump(res.eval,f)
         with open(os.path.join(output_folder,"coco_results.txt"),'w') as f:
-            recalls=np.mean(res.eval['recall'][0,:,:,:],axis=0)
+            recalls=np.mean(res.eval['recall'][0,:,:,:],axis=0)#@.5 mean classes
             for k,v in results.results.items():
                 if isinstance(v,dict):
                     for k1,v1 in v.items():
                         f.write(str(k1)+'\t'+str(v1)+'\n')
-            f.write('Recall@.5:\n')
+            f.write('Recall@.5:(all,small,medium,large)|(1,10,100)\n')#recall      = -np.ones((T,K,A,M))
+            # self.maxDets = [1, 10, 100]
+            # self.areaRng = [[0 ** 2, 1e5 ** 2], [0 ** 2, 32 ** 2], [32 ** 2, 96 ** 2], [96 ** 2, 1e5 ** 2]]
+            # self.areaRngLbl = ['all', 'small', 'medium', 'large']
             for r in recalls:
                 f.write(str(r) + '\n')
             f.write('\n')

@@ -15,11 +15,12 @@ MODEL:
     DA_IMG_GRL_WEIGHT: 0.1
     DA_INS_GRL_WEIGHT: 0.1
   SW:
-    LC: True
-    GC: True
+    LC: False
+    GC: False
     DA_GRL_WEIGHT: 1.0
     SW_WEIGHT: 0.1
     SW_ROIBoxHead: True
+    TRANSFROM_EDGE: False
   ICR_CCR:
     DA_GRL_WEIGHT: 1.0
     CCR_WEIGHT: 0.1

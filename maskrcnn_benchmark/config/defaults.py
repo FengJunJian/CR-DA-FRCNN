@@ -37,7 +37,9 @@ _C.MODEL.WEIGHT = ""
 # -----------------------------------------------------------------------------
 # Parameters of SW_DA_RCNN
 # -----------------------------------------------------------------------------
+
 _C.MODEL.SW = CN()
+_C.MODEL.SW.TRANSFROM_EDGE=False
 _C.MODEL.SW.LC=True
 _C.MODEL.SW.GC=True
 _C.MODEL.SW.DA_GRL_WEIGHT=1.0

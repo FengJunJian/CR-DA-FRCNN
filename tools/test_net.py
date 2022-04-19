@@ -243,7 +243,7 @@ def main_testbbox():
         regxint=re.findall(r'\d+', cp)
         numstr=''
         if len(regxint)>0:
-            numstr=str(int(regxint[0]))
+            numstr=str(int(regxint[-1]))
         save_dir = os.path.join(model_dir, 'inference' + numstr)
         # if not os.path.exists(save_dir):
         #     os.mkdir(save_dir)

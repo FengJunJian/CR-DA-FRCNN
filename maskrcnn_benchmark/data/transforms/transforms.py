@@ -4,7 +4,13 @@ import random
 import torch
 import torchvision
 from torchvision.transforms import functional as F
-
+import imgaug.augmenters as iaa
+import numpy as np
+from PIL import Image
+try:
+    import accimage
+except ImportError:
+    accimage = None
 
 class Compose(object):
     def __init__(self, transforms):
@@ -23,6 +29,20 @@ class Compose(object):
         format_string += "\n)"
         return format_string
 
+class Edge_T(object):
+    def __init__(self,):
+        self.aug = iaa.EdgeDetect(alpha=(1.0))
+
+    def __call__(self, image, target):
+        if isinstance(image, Image.Image):
+            image=np.array(image)
+
+        image = self.aug(image=image)
+        # elif isinstance(image,torch.Tensor):
+        #     image=image.numpy()
+        #     im=self.aug(images=image)
+
+        return image, target
 
 class Resize(object):
     def __init__(self, min_size, max_size):

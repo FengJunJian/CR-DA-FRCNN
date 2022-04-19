@@ -180,6 +180,25 @@ class DatasetCatalog(object):
         },
 
         #######################Ship dataset#################################
+        ###transfer
+        'trainsfer_test_SeaShips_cocostyle': {
+            "img_dir": 'E:/SeaShips_SMD/JPEGImages',
+            "ann_file": 'E:/SeaShips_SMD/trainsfer_test_SeaShips_cocostyle.json'
+        },
+        'trainsfer_test_SMD_cocostyle': {
+            "img_dir": 'E:/SeaShips_SMD/JPEGImages',
+            "ann_file": 'E:/SeaShips_SMD/trainsfer_test_SMD_cocostyle.json'
+        },
+        'trainsfer_train_SeaShips_cocostyle': {
+            "img_dir": 'E:/SeaShips_SMD/JPEGImages',
+            "ann_file": 'E:/SeaShips_SMD/trainsfer_train_SeaShips_cocostyle.json'
+        },
+        'trainsfer_train_SMD_cocostyle': {
+            "img_dir": 'E:/SeaShips_SMD/JPEGImages',
+            "ann_file": 'E:/SeaShips_SMD/trainsfer_train_SMD_cocostyle.json'
+        },
+
+
 
         ####cocostyle
         ##multiple ship categories############################################################################

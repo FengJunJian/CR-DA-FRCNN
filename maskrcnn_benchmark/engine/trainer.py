@@ -294,7 +294,7 @@ def do_da_sw_train(
 
         batch_time = time.time() - end
         end = time.time()
-        meters.update(time=batch_time, data=data_time)
+        meters.update(time=batch_time, data_time=data_time)
         meters.update(lr=optimizer.param_groups[0]["lr"])
 
         if iteration % 20 == 0 or iteration == max_iter:
