@@ -2,7 +2,7 @@
 import bisect
 import copy
 import logging
-
+import os
 import torch.utils.data
 from maskrcnn_benchmark.utils.comm import get_world_size
 from maskrcnn_benchmark.utils.imports import import_file
@@ -11,7 +11,7 @@ from . import datasets as D
 from . import samplers
 
 from .collate_batch import BatchCollator
-from .transforms import build_transforms,build_transforms_edge
+from .transforms import build_transforms#,build_transforms_edge
 
 # import torchvision.transforms as T
 
@@ -53,6 +53,68 @@ def build_dataset(dataset_list, transforms, dataset_catalog, is_train=True, is_s
 
     # for training, concatenate all datasets into a single one
     dataset = datasets[0]
+    if len(datasets) > 1:
+        dataset = D.ConcatDataset(datasets)
+
+    return [dataset]
+
+
+def build_dataset_pseudo(dataset_list, dataset_pseudo, transforms, dataset_catalog, predictionPath,is_train=True, is_source=True):
+    """
+    Arguments:
+        dataset_list (list[str]): Contains the names of the datasets, i.e.,
+            coco_2014_trian, coco_2014_val, etc
+        dataset_pseudo_list (list[str]): Contains the names of the datasets with pseudo label, i.e.,
+            coco_2014_trian, coco_2014_val, etc
+        transforms (callable): transforms to apply to each (image, target) sample
+        dataset_catalog (DatasetCatalog): contains the information on how to
+            construct a dataset.
+        is_train (bool): whether to setup the dataset for training or testing
+    """
+    if not isinstance(dataset_list, (list, tuple)):
+        raise RuntimeError(
+            "dataset_list should be a list of strings, got {}".format(dataset_list)
+        )
+    datasets = []
+    for dataset_name in dataset_list:
+        data = dataset_catalog.get(dataset_name)
+        factory = getattr(D, data["factory"])
+        args = data["args"]
+        # for COCODataset, we want to remove images without annotations
+        # during training
+        if data["factory"] == "COCODataset":
+            args["remove_images_without_annotations"] = is_train
+            args["is_source"] = is_source
+        if data["factory"] == "PascalVOCDataset":
+            args["use_difficult"] = not is_train
+        args["transforms"] = transforms
+
+        # make dataset from factory
+        dataset = factory(**args)
+        datasets.append(dataset)
+
+    #datasets_pseudo = []
+    #for dataset_name in dataset_pseudo_list:
+    data = dataset_catalog.get(dataset_pseudo)
+    factory = getattr(D, data["factory"])
+    args = data["args"]
+    # for COCODataset, we want to remove images without annotations
+    # during training
+    if data["factory"] == "COCODataset":
+        args["remove_images_without_annotations"] = is_train
+        args["is_source"] = is_source
+    if data["factory"] == "PascalVOCDataset":
+        args["use_difficult"] = not is_train
+    args["transforms"] = transforms
+    args["is_pseudo"]=True
+    args["predictionPath"] = predictionPath
+    # make dataset from factory
+    dataset = factory(**args)
+    datasets.append(dataset)
+
+    # for training, concatenate all datasets into a single one
+    dataset = datasets[0]
+
     if len(datasets) > 1:
         dataset = D.ConcatDataset(datasets)
 
@@ -107,7 +169,7 @@ def make_batch_data_sampler(
     return batch_sampler
 
 
-def make_data_loader(cfg, is_train=True, is_source=True, is_distributed=False, start_iter=0):
+def make_data_loader(cfg, is_train=True, is_source=True, is_distributed=False, start_iter=0,has_unlabel=False):
     num_gpus = get_world_size()
     if is_train:
         images_per_batch = cfg.SOLVER.IMS_PER_BATCH
@@ -166,12 +228,15 @@ def make_data_loader(cfg, is_train=True, is_source=True, is_distributed=False, s
     else:
         dataset_list = cfg.DATASETS.TEST
 
-    if cfg.MODEL.SW.TRANSFROM_EDGE:
-        transforms = build_transforms_edge(cfg, is_train)  # preprocessing
+    # if cfg.MODEL.SW.TRANSFROM_EDGE:
+    #     transforms = build_transforms_edge(cfg, is_train)  # preprocessing
+    # else:
+    transforms = build_transforms(cfg, is_train)#preprocessing
+    if has_unlabel and is_train:
+        pseudo_path=os.path.join(cfg.DATASETS.PSEUDO_PATH,cfg.DATASETS.PSEUDO_TRAIN,'predictions.pth')
+        datasets = build_dataset_pseudo(dataset_list,cfg.DATASETS.PSEUDO_TRAIN, transforms, DatasetCatalog, pseudo_path,is_train, is_source)
     else:
-        transforms = build_transforms(cfg, is_train)#preprocessing
-
-    datasets = build_dataset(dataset_list, transforms, DatasetCatalog, is_train, is_source)
+        datasets = build_dataset(dataset_list, transforms, DatasetCatalog, is_train, is_source)
 
     data_loaders = []
     for dataset in datasets:
@@ -194,3 +259,4 @@ def make_data_loader(cfg, is_train=True, is_source=True, is_distributed=False, s
         assert len(data_loaders) == 1
         return data_loaders[0]
     return data_loaders
+
