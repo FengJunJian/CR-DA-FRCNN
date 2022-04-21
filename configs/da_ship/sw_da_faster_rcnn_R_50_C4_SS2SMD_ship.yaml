@@ -28,8 +28,11 @@ MODEL:
 DATALOADER:
   SIZE_DIVISIBILITY: 32
 DATASETS:
+  PSEUDO_PATH: None
+  PSEUDO: False
   TRAIN: ("ship_train_SeaShips_cocostyle",)
   SOURCE_TRAIN: ("ship_train_SeaShips_cocostyle",)
+  PSEUDO_TRAIN: "ship_train_SMD_cocostyle"
   TARGET_TRAIN: ("ship_train_SMD_cocostyle",)
   TEST: ("ship_test_SMD_cocostyle",)
 INPUT:
