@@ -2,11 +2,11 @@
 import torch
 
 import pycocotools.mask as mask_utils
-
+import numpy as np
 # transpose
 FLIP_LEFT_RIGHT = 0
 FLIP_TOP_BOTTOM = 1
-
+import cv2
 
 class Mask(object):
     """
@@ -47,6 +47,44 @@ class Mask(object):
     def resize(self, size, *args, **kwargs):
         pass
 
+def mask2polygons(masks):
+    segs = []
+    for mask in masks:
+        if isinstance(mask, torch.Tensor):
+            mask = mask.numpy()
+        mask = np.asfortranarray(mask)
+        rles = mask_utils.encode(mask)
+        bbox = mask_utils.toBbox(rles)#[xmin,ymin,w,h]
+
+        #m=cv2.bitwise_or(masks[3],masks[4])
+        #m=masks[3]
+        # m=np.asfortranarray(m)
+        # rles = mask_utils.encode(m)
+        # bbox = mask_utils.toBbox(rles)
+        # bbox=bbox.astype(np.int)
+        # m1 = np.ascontiguousarray(m)
+        # m1=cv2.rectangle(m1*125,(bbox[0],bbox[1]),(bbox[0]+bbox[2],bbox[1]+bbox[3]),(255))
+        # cv2.imshow('a',m1)
+        # cv2.waitKey()
+        # C, h = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        # seg = [[float(x) for x in contour.flatten()] for contour in C]
+        # cv2.drawContours(m,C,-1,(255))
+        seg = []
+        # bbox[] is x,y,w,h
+        # left_top
+        seg.append(bbox[0])
+        seg.append(bbox[1])
+        # left_bottom
+        seg.append(bbox[0])
+        seg.append(bbox[1] + bbox[3])
+        # right_bottom
+        seg.append(bbox[0] + bbox[2])
+        seg.append(bbox[1] + bbox[3])
+        # right_top
+        seg.append(bbox[0] + bbox[2])
+        seg.append(bbox[1])
+        segs.append([seg])#[seg]
+    return segs
 
 class Polygons(object):
     """
@@ -122,7 +160,7 @@ class Polygons(object):
 
         return Polygons(scaled_polygons, size=size, mode=self.mode)
 
-    def convert(self, mode,masks=None):
+    def convert(self, mode):
         width, height = self.size
         if mode == "mask":
             rles = mask_utils.frPyObjects(
@@ -133,29 +171,7 @@ class Polygons(object):
             mask = torch.from_numpy(mask)
             # TODO add squeeze?
             return mask
-        elif mode=="point":
-            segs=[]
-            for mask in masks:
-                if isinstance(mask,torch.Tensor):
-                    mask=mask.numpy()
-                rles1 = mask_utils.encode(mask)
-                bbox=mask_utils.toBbox(rles1)
-                seg = []
-                # bbox[] is x,y,w,h
-                # left_top
-                seg.append(bbox[0])
-                seg.append(bbox[1])
-                # left_bottom
-                seg.append(bbox[0])
-                seg.append(bbox[1] + bbox[3])
-                # right_bottom
-                seg.append(bbox[0] + bbox[2])
-                seg.append(bbox[1] + bbox[3])
-                # right_top
-                seg.append(bbox[0] + bbox[2])
-                seg.append(bbox[1])
-                segs.append(seg)
-            return segs
+
 
     def __repr__(self):
         s = self.__class__.__name__ + "("

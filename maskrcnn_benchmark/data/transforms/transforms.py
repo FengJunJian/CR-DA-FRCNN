@@ -41,7 +41,6 @@ class Edge_T(object):
         # elif isinstance(image,torch.Tensor):
         #     image=image.numpy()
         #     im=self.aug(images=image)
-
         return image, target
 
 class Resize(object):
@@ -75,6 +74,7 @@ class Resize(object):
         return (oh, ow)
 
     def __call__(self, image, target):
+
         size = self.get_size(image.size)
         image = F.resize(image, size)
         target = target.resize(image.size)
