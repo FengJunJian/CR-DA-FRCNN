@@ -52,7 +52,6 @@ class BoxList(object):
         for k, v in bbox.extra_fields.items():
             self.extra_fields[k] = v
 
-
     def convert(self, mode):
         if mode not in ("xyxy", "xywh"):
             raise ValueError("mode should be 'xyxy' or 'xywh'")
