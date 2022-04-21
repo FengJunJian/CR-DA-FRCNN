@@ -122,7 +122,7 @@ class Polygons(object):
 
         return Polygons(scaled_polygons, size=size, mode=self.mode)
 
-    def convert(self, mode):
+    def convert(self, mode,masks=None):
         width, height = self.size
         if mode == "mask":
             rles = mask_utils.frPyObjects(
@@ -133,6 +133,29 @@ class Polygons(object):
             mask = torch.from_numpy(mask)
             # TODO add squeeze?
             return mask
+        elif mode=="point":
+            segs=[]
+            for mask in masks:
+                if isinstance(mask,torch.Tensor):
+                    mask=mask.numpy()
+                rles1 = mask_utils.encode(mask)
+                bbox=mask_utils.toBbox(rles1)
+                seg = []
+                # bbox[] is x,y,w,h
+                # left_top
+                seg.append(bbox[0])
+                seg.append(bbox[1])
+                # left_bottom
+                seg.append(bbox[0])
+                seg.append(bbox[1] + bbox[3])
+                # right_bottom
+                seg.append(bbox[0] + bbox[2])
+                seg.append(bbox[1] + bbox[3])
+                # right_top
+                seg.append(bbox[0] + bbox[2])
+                seg.append(bbox[1])
+                segs.append(seg)
+            return segs
 
     def __repr__(self):
         s = self.__class__.__name__ + "("
