@@ -78,9 +78,12 @@ _C.INPUT.TO_BGR255 = True
 # -----------------------------------------------------------------------------
 _C.DATASETS = CN()
 # List of the dataset names for training, as present in paths_catalog.py
+_C.DATASETS.PSEUDO_PATH=None #prediction.pth
+_C.DATASETS.PSEUDO=False
 _C.DATASETS.TRAIN = ()
 _C.DATASETS.SOURCE_TRAIN = ()
-_C.DATASETS.TARGET_TRAIN = ()
+_C.DATASETS.TARGET_TRAIN = None
+_C.DATASETS.PSEUDO_TRAIN = None
 # List of the dataset names for testing, as present in paths_catalog.py
 _C.DATASETS.TEST = ()
 
