@@ -5,8 +5,8 @@ import torchvision
 from maskrcnn_benchmark.structures.bounding_box import BoxList
 from maskrcnn_benchmark.structures.segmentation_mask import SegmentationMask
 from maskrcnn_benchmark.structures.keypoint import PersonKeypoints
-
-
+#from maskrcnn_benchmark.data.datasets.evaluation.coco.coco_eval import prepare_for_coco_detection
+import numpy as np
 min_keypoints_per_image = 10
 
 
@@ -38,20 +38,44 @@ def has_valid_annotation(anno):
 
 class COCODataset(torchvision.datasets.coco.CocoDetection):
     def __init__(
-        self, ann_file, root, remove_images_without_annotations, transforms=None, is_source= True
-    ):
+        self, ann_file, root, remove_images_without_annotations, transforms=None, is_source= True,is_pseudo=False,
+    predictionPath=None):
+        from pycocotools.coco import COCO
+        # ann_file = "E:\SeaShips_SMD/ship_test_SMD_cocostyle.json"
+        # predictionPath = "E:\DA1\SW\logSSToSMDship\inference20000\ship_test_SMD_cocostyle/predictions.pth"
         super(COCODataset, self).__init__(root, ann_file)
         # sort indices for reproducible results
         self.ids = sorted(self.ids)
-
+        self.pseudo_threshold=0.9
         # filter images without detection annotations
+        if is_pseudo:
+            assert predictionPath
+            self.pseudo_label=torch.load(predictionPath)
+
         if remove_images_without_annotations:
             ids = []
             for img_id in self.ids:
-                ann_ids = self.coco.getAnnIds(imgIds=img_id, iscrowd=None)
-                anno = self.coco.loadAnns(ann_ids)
-                if has_valid_annotation(anno):
-                    ids.append(img_id)
+                if is_pseudo:
+                    boxes=self.pseudo_label[img_id - 1]
+                    if len(boxes)>0:
+                        scores=boxes.get_field('scores')
+                        if isinstance(scores,torch.Tensor):
+                            scores=scores.numpy()
+                        inds=np.where(scores>self.pseudo_threshold)[0]
+                        if len(inds)>0:
+                            self.pseudo_label[img_id - 1]=boxes[inds]
+                            ids.append(img_id)
+                    # else:
+                    #     ig_ids.append(img_id)
+                        #print(img_id)
+                else:
+                    ann_ids = self.coco.getAnnIds(imgIds=img_id, iscrowd=None)
+                    anno = self.coco.loadAnns(ann_ids)
+                    if has_valid_annotation(anno):
+                        ids.append(img_id)
+                    # else:
+                    #     ig_ids1.append(img_id)
+                        #print(img_id)
             self.ids = ids
 
         self.json_category_id_to_contiguous_id = {
@@ -63,29 +87,38 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
         self.id_to_img_map = {k: v for k, v in enumerate(self.ids)}
         self._transforms = transforms
         self.is_source = is_source
+        self.is_pseudo=is_pseudo
 
     def __getitem__(self, idx):#index
         img, anno = super(COCODataset, self).__getitem__(idx)
+        #indices = [index] + random.choices(self.indices, k=3) # mixup
+        if self.is_pseudo:
+            target=self.pseudo_label[self.ids[idx] - 1]
+            target=target.resize(img.size)
+            classes=target.get_field('labels')
+            pseudo_flag=torch.ones_like(classes, dtype=torch.uint8)
+            target.add_field("is_pseudo", pseudo_flag)  # add pseudo flag
+        else:
+            # filter crowd annotations
+            # TODO might be better to add an extra field
+            anno = [obj for obj in anno if obj["iscrowd"] == 0]
 
-        # filter crowd annotations
-        # TODO might be better to add an extra field
-        anno = [obj for obj in anno if obj["iscrowd"] == 0]
+            boxes = [obj["bbox"] for obj in anno]
+            boxes = torch.as_tensor(boxes).reshape(-1, 4)  # guard against no boxes
+            target = BoxList(boxes, img.size, mode="xywh").convert("xyxy")
 
-        boxes = [obj["bbox"] for obj in anno]
-        boxes = torch.as_tensor(boxes).reshape(-1, 4)  # guard against no boxes
-        target = BoxList(boxes, img.size, mode="xywh").convert("xyxy")
+            classes = [obj["category_id"] for obj in anno]
+            classes = [self.json_category_id_to_contiguous_id[c] for c in classes]
+            classes = torch.tensor(classes)
+            target.add_field("labels", classes)
 
-        classes = [obj["category_id"] for obj in anno]
-        classes = [self.json_category_id_to_contiguous_id[c] for c in classes]
-        classes = torch.tensor(classes)
-        target.add_field("labels", classes)
+            masks = [obj["segmentation"] for obj in anno]
+            masks = SegmentationMask(masks, img.size)
+            target.add_field("masks", masks)
 
-        masks = [obj["segmentation"] for obj in anno]
-        masks = SegmentationMask(masks, img.size)
-        target.add_field("masks", masks)
-
-        domain_labels = torch.ones_like(classes, dtype=torch.uint8) if self.is_source else torch.zeros_like(classes, dtype=torch.uint8)
+        domain_labels = torch.ones_like(classes, dtype=torch.uint8) if self.is_source else torch.zeros_like(classes, dtype=torch.uint8)#source label:1,target label:0
         target.add_field("is_source", domain_labels)
+
 
         if anno and "keypoints" in anno[0]:
             keypoints = [obj["keypoints"] for obj in anno]
