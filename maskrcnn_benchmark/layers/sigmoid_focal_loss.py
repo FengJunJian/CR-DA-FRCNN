@@ -37,7 +37,7 @@ class _SigmoidFocalLoss(Function):
 
 
 # sigmoid_focal_loss_cuda = _SigmoidFocalLoss.apply#ctx, logits, targets, gamma, alpha
-sigmoid_focal_loss=ops.sigmoid_focal_loss#inputs,targets,alpha: float = 0.25,gamma: float = 2,reduction: str ="none",
+#sigmoid_focal_loss=#inputs,targets,alpha: float = 0.25,gamma: float = 2,reduction: str ="none",
 
 def sigmoid_focal_loss_cpu(logits, targets, gamma, alpha):
     num_classes = logits.shape[1]
@@ -60,17 +60,17 @@ class SigmoidFocalLoss(nn.Module):
         self.gamma = gamma
         self.alpha = alpha
 
-    def forward(self, logits, targets):
+    def forward(self, logits, targets,reduction="mean"):
         device = logits.device
         # if logits.is_cuda:
         #     loss_func = sigmoid_focal_loss_cuda#logits, targets, gamma, alpha
         # else:
         #     loss_func = sigmoid_focal_loss_cpu
-        loss_func = sigmoid_focal_loss
+        loss_func = ops.sigmoid_focal_loss
         #ops.sigmoid_focal_loss()
         #loss = loss_func(logits, targets, self.gamma, self.alpha)#
-        loss = loss_func(inputs=logits, targets=targets, alpha=self.alpha,gamma=self.gamma)#pytorch 1.7.0
-        return loss.mean()
+        loss = loss_func(inputs=logits, targets=targets, alpha=self.alpha,gamma=self.gamma,reduction=reduction)#pytorch 1.7.0
+        return loss
 
     def __repr__(self):
         tmpstr = self.__class__.__name__ + "("
