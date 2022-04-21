@@ -26,7 +26,7 @@ from maskrcnn_benchmark.utils.comm import synchronize, get_rank
 from maskrcnn_benchmark.utils.imports import import_file
 from maskrcnn_benchmark.utils.logger import setup_logger
 from maskrcnn_benchmark.utils.miscellaneous import mkdir
-from ForTest import testbbox
+
 
 def train(cfg, local_rank, distributed):
     model = build_detection_model(cfg)
@@ -65,6 +65,7 @@ def train(cfg, local_rank, distributed):
             is_source=True,
             is_distributed=distributed,
             start_iter=arguments["iteration"],
+            has_unlabel=cfg.DATASETS.PSEUDO
         )
         target_data_loader = make_data_loader(
             cfg,
