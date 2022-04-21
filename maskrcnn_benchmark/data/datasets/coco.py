@@ -5,7 +5,7 @@ import torchvision
 from maskrcnn_benchmark.structures.bounding_box import BoxList
 from maskrcnn_benchmark.structures.segmentation_mask import SegmentationMask
 from maskrcnn_benchmark.structures.keypoint import PersonKeypoints
-#from maskrcnn_benchmark.data.datasets.evaluation.coco.coco_eval import prepare_for_coco_detection
+
 import numpy as np
 min_keypoints_per_image = 10
 
@@ -98,6 +98,11 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
             classes=target.get_field('labels')
             pseudo_flag=torch.ones_like(classes, dtype=torch.uint8)
             target.add_field("is_pseudo", pseudo_flag)  # add pseudo flag
+
+            # masks = [obj["segmentation"] for obj in anno]
+            # masks = SegmentationMask(masks, img.size)
+            # target.add_field("masks", masks)
+
         else:
             # filter crowd annotations
             # TODO might be better to add an extra field
