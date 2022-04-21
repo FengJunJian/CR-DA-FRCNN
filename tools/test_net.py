@@ -233,7 +233,7 @@ def main_testbbox():
                 cfg.MODEL.WEIGHT=os.path.join(model_dir,os.path.basename(lines[-1]))
         else:
             cfg.MODEL.WEIGHT=os.path.join(model_dir,'model_final.pth')
-    assert len(cfg.DATASETS.TEST)==1
+    # assert len(cfg.DATASETS.TEST)==1
     if args.flagEven:
         writerT = SummaryWriter(os.path.join(cfg.OUTPUT_DIR, 'even_'+cfg.DATASETS.TEST[0]))#+time.strftime("%Y-%m-%d %H:%M:%S",time.localtime()).replace(':','-')
     if not isinstance(cfg.MODEL.WEIGHT,list):
@@ -256,6 +256,7 @@ def main_testbbox():
         logger.info("results will be saved in %s"%(save_dir))
 
         testResult=testbbox(cfg,model,numstr,flagVisual=args.flagVisual)# will call the model.eval()
+
         if args.flagEven:
             try:
                 for k, v in testResult[0][0].results['bbox'].items():
@@ -266,97 +267,97 @@ def main_testbbox():
         #model.train()  # see testbbox function
 
 
-def visualization(predictions,dataset,output_folder,num_color,threshold=0.5):#threshold=0.1,iou_type="bbox"
-    #num_color = cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES
-    hsv_tuples = [(x / num_color, 1., 1.)
-                  for x in range(num_color)]
-    colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
-    colors = list(
-        map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)),
-            colors))
-    colors = [c[::-1] for c in colors]
-    CLASS_NAMES=[None]*num_color#cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES
-    CLASS_NAMES[0]='__background__'
-    for k,v in dataset.coco.cats.items():
-        CLASS_NAMES[k]=v['name']
-
-    def write_detection(im, dets,thiness=5,GT_color=None):
-        for i in range(len(dets)):
-            rectangle_tmp = im.copy()
-            bbox = dets[i, :4].astype(np.int32)
-            class_ind = int(dets[i, 4])
-            if class_ind==7:
-                continue
-            # score = dets[i, -1]
-            if GT_color:
-                color=GT_color
-            else:
-                color=colors[class_ind]
-
-            string = CLASS_NAMES[class_ind]
-            # string = '%s' % (CLASSES[class_ind])
-            fontFace = cv2.FONT_HERSHEY_COMPLEX
-            fontScale = 1.5
-            # thiness = 2
-
-            text_size, baseline = cv2.getTextSize(string, fontFace, fontScale, thiness)
-            text_origin = (bbox[0]-1, bbox[1])  # - text_size[1]
-        ###########################################putText
-            cv2.rectangle(rectangle_tmp, (text_origin[0] - 1, text_origin[1] + 1),
-                               (text_origin[0] + text_size[0] + 1, text_origin[1] - text_size[1] - 2),
-                               color, cv2.FILLED)
-            cv2.addWeighted(im, 0.7, rectangle_tmp, 0.3, 0, im)
-            im = cv2.rectangle(im, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, thiness)
-            im = cv2.putText(im, string, text_origin,
-                             fontFace, fontScale, (0, 0, 0), thiness,lineType=-1)
-        return im
-
-    Imgroot=dataset.root
-
-    for image_id, prediction in enumerate(tqdm(predictions)):
-        if len(prediction) == 0:
-            continue
-        img_info = dataset.get_img_info(image_id)
-        # original_id = dataset.id_to_img_map[image_id]
-        original_id=img_info['id']
-        image_width = img_info["width"]
-        image_height = img_info["height"]
-        # if 'MVI_1474_VIS_00120' in img_info['file_name']:
-        #     a=11111
-        prediction = boxlist_nms(
-            prediction, 0.5
-        )####nms
-        prediction = prediction.resize((image_width, image_height))
-        prediction = prediction.convert("xyxy")
-
-        gts=[]
-        for anns in dataset.coco.imgToAnns[original_id]:
-            gttemp=anns['bbox']
-            gt=[gttemp[0],gttemp[1],gttemp[0]+gttemp[2],gttemp[1]+gttemp[3]]
-            gt.append(anns['category_id'])  # gt_label
-            gts.append(gt)
-        gts=np.array(gts)
-
-        # gt=dataset.coco.imgToAnns[original_id]['bbox']
-        # gt.append(dataset.coco.anns[original_id]['category_id'])  # gt_label
-        # boxes = prediction.bbox.tolist()
-        # scores = prediction.get_field("scores").tolist()
-        # labels = prediction.get_field("labels").tolist()
-        # mapped_labels = [dataset.contiguous_category_id_to_json_id[i] for i in labels]
-
-        image_path=os.path.join(Imgroot,img_info['file_name'])
-        im=cv2.imread(image_path)
-        dets=prediction.bbox.numpy()
-        dets = np.hstack([dets,np.reshape(prediction.get_field("labels").numpy(),[-1,1])])#labels
-        dets = np.hstack([dets, np.reshape(prediction.get_field("scores").numpy(), [-1, 1])])  # scores
-        inds=np.where(dets[:,4]>threshold)[0]#label>0
-        dets=dets[inds,:]
-        inds=np.where(dets[:,5]>0)[0]#scores>threshold
-        dets=dets[inds,:]
-        im=write_detection(im,dets,thiness=2)
-        #im=write_detection(im,gts,(0,0,255),thiness=2)
-        #cv2.imshow('b',im)
-        cv2.imwrite(os.path.join(output_folder,img_info['file_name']),im)
+# def visualization(predictions,dataset,output_folder,num_color,threshold=0.5):#threshold=0.1,iou_type="bbox"
+#     #num_color = cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES
+#     hsv_tuples = [(x / num_color, 1., 1.)
+#                   for x in range(num_color)]
+#     colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
+#     colors = list(
+#         map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)),
+#             colors))
+#     colors = [c[::-1] for c in colors]
+#     CLASS_NAMES=[None]*num_color#cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES
+#     CLASS_NAMES[0]='__background__'
+#     for k,v in dataset.coco.cats.items():
+#         CLASS_NAMES[k]=v['name']
+#
+#     def write_detection(im, dets,thiness=5,GT_color=None):
+#         for i in range(len(dets)):
+#             rectangle_tmp = im.copy()
+#             bbox = dets[i, :4].astype(np.int32)
+#             class_ind = int(dets[i, 4])
+#             if class_ind==7:
+#                 continue
+#             # score = dets[i, -1]
+#             if GT_color:
+#                 color=GT_color
+#             else:
+#                 color=colors[class_ind]
+#
+#             string = CLASS_NAMES[class_ind]
+#             # string = '%s' % (CLASSES[class_ind])
+#             fontFace = cv2.FONT_HERSHEY_COMPLEX
+#             fontScale = 1.5
+#             # thiness = 2
+#
+#             text_size, baseline = cv2.getTextSize(string, fontFace, fontScale, thiness)
+#             text_origin = (bbox[0]-1, bbox[1])  # - text_size[1]
+#         ###########################################putText
+#             cv2.rectangle(rectangle_tmp, (text_origin[0] - 1, text_origin[1] + 1),
+#                                (text_origin[0] + text_size[0] + 1, text_origin[1] - text_size[1] - 2),
+#                                color, cv2.FILLED)
+#             cv2.addWeighted(im, 0.7, rectangle_tmp, 0.3, 0, im)
+#             im = cv2.rectangle(im, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, thiness)
+#             im = cv2.putText(im, string, text_origin,
+#                              fontFace, fontScale, (0, 0, 0), thiness,lineType=-1)
+#         return im
+#
+#     Imgroot=dataset.root
+#
+#     for image_id, prediction in enumerate(tqdm(predictions)):
+#         if len(prediction) == 0:
+#             continue
+#         img_info = dataset.get_img_info(image_id)
+#         # original_id = dataset.id_to_img_map[image_id]
+#         original_id=img_info['id']
+#         image_width = img_info["width"]
+#         image_height = img_info["height"]
+#         # if 'MVI_1474_VIS_00120' in img_info['file_name']:
+#         #     a=11111
+#         prediction = boxlist_nms(
+#             prediction, 0.5
+#         )####nms
+#         prediction = prediction.resize((image_width, image_height))
+#         prediction = prediction.convert("xyxy")
+#
+#         gts=[]
+#         for anns in dataset.coco.imgToAnns[original_id]:
+#             gttemp=anns['bbox']
+#             gt=[gttemp[0],gttemp[1],gttemp[0]+gttemp[2],gttemp[1]+gttemp[3]]
+#             gt.append(anns['category_id'])  # gt_label
+#             gts.append(gt)
+#         gts=np.array(gts)
+#
+#         # gt=dataset.coco.imgToAnns[original_id]['bbox']
+#         # gt.append(dataset.coco.anns[original_id]['category_id'])  # gt_label
+#         # boxes = prediction.bbox.tolist()
+#         # scores = prediction.get_field("scores").tolist()
+#         # labels = prediction.get_field("labels").tolist()
+#         # mapped_labels = [dataset.contiguous_category_id_to_json_id[i] for i in labels]
+#
+#         image_path=os.path.join(Imgroot,img_info['file_name'])
+#         im=cv2.imread(image_path)
+#         dets=prediction.bbox.numpy()
+#         dets = np.hstack([dets,np.reshape(prediction.get_field("labels").numpy(),[-1,1])])#labels
+#         dets = np.hstack([dets, np.reshape(prediction.get_field("scores").numpy(), [-1, 1])])  # scores
+#         inds=np.where(dets[:,4]>threshold)[0]#label>0
+#         dets=dets[inds,:]
+#         inds=np.where(dets[:,5]>0)[0]#scores>threshold
+#         dets=dets[inds,:]
+#         im=write_detection(im,dets,thiness=2)
+#         #im=write_detection(im,gts,(0,0,255),thiness=2)
+#         #cv2.imshow('b',im)
+#         cv2.imwrite(os.path.join(output_folder,img_info['file_name']),im)
 
 
 # def myeval(predictions,dataset,output_folder,iou_type="bbox"):
