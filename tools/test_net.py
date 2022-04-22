@@ -197,7 +197,8 @@ def main_testbbox():
     num_gpus = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
     distributed = num_gpus > 1
     print(args.opts)
-    time.sleep(1)
+    print(args.flagVisual)
+    time.sleep(2)
     if distributed:
         torch.cuda.set_device(args.local_rank)
         torch.distributed.init_process_group(
