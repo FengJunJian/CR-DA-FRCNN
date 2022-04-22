@@ -24,7 +24,7 @@ class FastRCNNPredictor(nn.Module):
 
         self.cls_score = nn.Linear(num_inputs, num_classes)
         num_bbox_reg_classes = 2 if config.MODEL.CLS_AGNOSTIC_BBOX_REG else num_classes
-        self.bbox_pred = nn.Linear(num_inputs, num_bbox_reg_classes * 4)
+        self.bbox_pred = nn.Linear(num_inputs, num_bbox_reg_classes * 4)#class_agnostic
 
         nn.init.normal_(self.cls_score.weight, mean=0, std=0.01)
         nn.init.constant_(self.cls_score.bias, 0)
