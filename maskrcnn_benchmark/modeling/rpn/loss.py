@@ -51,11 +51,11 @@ class RPNLossComputation(object):
         )
 
     def match_targets_to_anchors(self, anchor, target, copied_fields=[]):
-        match_quality_matrix = boxlist_iou(target, anchor)
+        match_quality_matrix = boxlist_iou(target, anchor)#compute the iou
         matched_idxs = self.proposal_matcher(match_quality_matrix)
         # RPN doesn't need any fields from target
         # for creating the labels, so clear them all
-        target = target.copy_with_fields(copied_fields)
+        target = target.copy_with_fields(copied_fields)#copied_fields
         # get the targets corresponding GT for each anchor
         # NB: need to clamp the indices because we can have a single
         # GT in the image, and matched_idxs can be -2, which goes
@@ -68,16 +68,22 @@ class RPNLossComputation(object):
         labels = []
         regression_targets = []
         masks = [] #masks for source domain data
+        pseudo_weights=[]
         for anchors_per_image, targets_per_image in zip(anchors, targets):
             is_source = targets_per_image.get_field('is_source')
             mask_per_image = is_source.new_ones(1, dtype=torch.uint8) if is_source.any() else is_source.new_zeros(1, dtype=torch.uint8)
             masks.append(mask_per_image)
             if not is_source.any():
                 continue
-            
+            pseudo_flag='scores' in targets_per_image.extra_fields#'is_pseudo'
+            if pseudo_flag:
+                self.copied_fields=['scores']
+            else:
+                self.copied_fields =[]
+
             matched_targets = self.match_targets_to_anchors(
-                anchors_per_image, targets_per_image, self.copied_fields
-            )#tile the target shape as same as anchors_per_image
+                anchors_per_image, targets_per_image,  self.copied_fields) #self.copied_fields
+            #tile the target shape as same as anchors_per_image
 
             matched_idxs = matched_targets.get_field("matched_idxs")
             labels_per_image = self.generate_labels_func(matched_targets)
@@ -102,9 +108,14 @@ class RPNLossComputation(object):
             )
 
             labels.append(labels_per_image)
+            if pseudo_flag:
+                pseudo_weights.append(matched_targets.get_field("scores"))
+            else:
+                pseudo_weights.append(torch.ones_like(labels_per_image,device=labels_per_image.device,dtype=torch.float32))
+            #pseudo_scores.append()
             regression_targets.append(regression_targets_per_image)
 
-        return labels, regression_targets, masks
+        return labels, regression_targets, masks,pseudo_weights
 
 
     def __call__(self, anchors, objectness, box_regression, targets):
@@ -120,7 +131,7 @@ class RPNLossComputation(object):
             box_loss (Tensor
         """
         anchors = [cat_boxlist(anchors_per_image) for anchors_per_image in anchors]
-        labels, regression_targets, masks = self.prepare_targets(anchors, targets)
+        labels, regression_targets, masks,pseudo_weights = self.prepare_targets(anchors, targets)#每个回归值匹配哪个scores
         
         masks = torch.cat(masks, dim=0)
         
@@ -136,20 +147,24 @@ class RPNLossComputation(object):
 
         labels = torch.cat(labels, dim=0)
         regression_targets = torch.cat(regression_targets, dim=0)
-
+        pseudo_weights=torch.cat(pseudo_weights,dim=0).detach()
         box_loss = smooth_l1_loss(
             box_regression[sampled_pos_inds],
             regression_targets[sampled_pos_inds],
-            reduction="sum",
+            reduction='none',#reduction="sum",
             beta=1.0 / 9,
             #size_average=False,
-        ) / (sampled_inds.numel())
+        )
+        box_loss=box_loss*pseudo_weights[sampled_pos_inds,None]
+        box_loss=box_loss.sum()/(sampled_inds.numel())#TODO evaluate the loss
+        #TODO weight the pesudo samples
 
-        # objectness_loss = F.binary_cross_entropy_with_logits( #TODO use focal loss
+        # objectness_loss = F.binary_cross_entropy_with_logits(
         #     objectness[sampled_inds], labels[sampled_inds]
         # )
-        objectness_loss=self.sigmoid_focal_loss(objectness[sampled_inds], labels[sampled_inds])
 
+        objectness_loss=self.sigmoid_focal_loss(objectness[sampled_inds], labels[sampled_inds],reduction="none")#reduction="none"  #TODO weight the pesudo samples
+        objectness_loss=(objectness_loss*pseudo_weights[sampled_inds]).mean()
         return objectness_loss, box_loss
 
 # This function should be overwritten in RetinaNet
