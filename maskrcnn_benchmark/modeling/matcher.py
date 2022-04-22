@@ -19,8 +19,8 @@ class Matcher(object):
 
     BELOW_LOW_THRESHOLD = -1
     BETWEEN_THRESHOLDS = -2
-
-    def __init__(self, high_threshold, low_threshold, allow_low_quality_matches=False):
+    BETWEEN_THRESHOLD_BG=-3
+    def __init__(self, high_threshold, low_threshold, pseudo_low_threshold=0.1,allow_low_quality_matches=False):
         """
         Args:
             high_threshold (float): quality values greater than or equal to
@@ -30,6 +30,7 @@ class Matcher(object):
                 1) matches >= high_threshold
                 2) BETWEEN_THRESHOLDS matches in [low_threshold, high_threshold)
                 3) BELOW_LOW_THRESHOLD matches in [0, low_threshold)
+                4) BETWEEN_THRESHOLD_BG matches in (bg_pseudo_low_threshold, low_threshold)
             allow_low_quality_matches (bool): if True, produce additional matches
                 for predictions that have only low-quality match candidates. See
                 set_low_quality_matches_ for more details.
@@ -37,6 +38,7 @@ class Matcher(object):
         assert low_threshold <= high_threshold
         self.high_threshold = high_threshold
         self.low_threshold = low_threshold
+        self.pseudo_low_threshold=pseudo_low_threshold
         self.allow_low_quality_matches = allow_low_quality_matches
 
     def __call__(self, match_quality_matrix):
@@ -72,9 +74,11 @@ class Matcher(object):
         between_thresholds = (matched_vals >= self.low_threshold) & (
             matched_vals < self.high_threshold
         )
+        between_bg_pseudo_threshold = (self.pseudo_low_threshold < matched_vals)&(matched_vals < self.low_threshold)
+
         matches[below_low_threshold] = Matcher.BELOW_LOW_THRESHOLD
         matches[between_thresholds] = Matcher.BETWEEN_THRESHOLDS
-
+        #matches[between_bg_pseudo_threshold]=Matcher.BETWEEN_THRESHOLD_BG
         if self.allow_low_quality_matches:
             self.set_low_quality_matches_(matches, all_matches, match_quality_matrix)#add the anchors which match gt with max iou
 
