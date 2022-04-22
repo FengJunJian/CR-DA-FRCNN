@@ -59,7 +59,7 @@ def build_dataset(dataset_list, transforms, dataset_catalog, is_train=True, is_s
     return [dataset]
 
 
-def build_dataset_pseudo(dataset_list, dataset_pseudo, transforms, dataset_catalog, predictionPath,is_train=True, is_source=True):
+def build_dataset_pseudo(dataset_pseudo, transforms, dataset_catalog, predictionPath, dataset_list=None, is_train=True, is_source=True):
     """
     Arguments:
         dataset_list (list[str]): Contains the names of the datasets, i.e.,
@@ -178,7 +178,7 @@ def make_data_loader(cfg, is_train=True, is_source=True, is_distributed=False, s
         ), "SOLVER.IMS_PER_BATCH ({}) must be divisible by the number "
         "of GPUs ({}) used.".format(images_per_batch, num_gpus)
         images_per_gpu = images_per_batch // num_gpus
-        if cfg.MODEL.DOMAIN_ADAPTATION_ON:
+        if cfg.MODEL.DOMAIN_ADAPTATION_ON or cfg.MODEL.SW_ON:
             assert (
             images_per_batch % (2*num_gpus) == 0
             ), "SOLVER.IMS_PER_BATCH ({}) must be divisible by 2 times the number "
@@ -221,7 +221,7 @@ def make_data_loader(cfg, is_train=True, is_source=True, is_distributed=False, s
     DatasetCatalog = paths_catalog.DatasetCatalog
 
     if is_train:
-        if cfg.MODEL.DOMAIN_ADAPTATION_ON:
+        if cfg.MODEL.DOMAIN_ADAPTATION_ON or cfg.MODEL.SW_ON:
             dataset_list = cfg.DATASETS.SOURCE_TRAIN if is_source else cfg.DATASETS.TARGET_TRAIN
         else:
             dataset_list = cfg.DATASETS.TRAIN
@@ -234,7 +234,7 @@ def make_data_loader(cfg, is_train=True, is_source=True, is_distributed=False, s
     transforms = build_transforms(cfg, is_train)#preprocessing
     if has_unlabel and is_train:
         pseudo_path=os.path.join(cfg.DATASETS.PSEUDO_PATH,cfg.DATASETS.PSEUDO_TRAIN,'predictions.pth')
-        datasets = build_dataset_pseudo(dataset_list,cfg.DATASETS.PSEUDO_TRAIN, transforms, DatasetCatalog, pseudo_path,is_train, is_source)
+        datasets = build_dataset_pseudo(cfg.DATASETS.PSEUDO_TRAIN, transforms, DatasetCatalog, pseudo_path,dataset_list=dataset_list,is_train=is_train, is_source=is_source)
     else:
         datasets = build_dataset(dataset_list, transforms, DatasetCatalog, is_train, is_source)
 
@@ -251,7 +251,7 @@ def make_data_loader(cfg, is_train=True, is_source=True, is_distributed=False, s
             num_workers=num_workers,
             batch_sampler=batch_sampler,
             collate_fn=collator,
-            prefetch_factor=2,
+            prefetch_factor=3,
         )
         data_loaders.append(data_loader)
     if is_train:
