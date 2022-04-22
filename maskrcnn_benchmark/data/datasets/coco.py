@@ -46,7 +46,7 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
         super(COCODataset, self).__init__(root, ann_file)
         # sort indices for reproducible results
         self.ids = sorted(self.ids)
-        self.pseudo_threshold=0.9
+        self.pseudo_threshold=0.1#0.9\0.8\0.7 adative learning
         # filter images without detection annotations
         if is_pseudo:
             assert predictionPath
@@ -120,7 +120,8 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
             masks = [obj["segmentation"] for obj in anno]
             masks = SegmentationMask(masks, img.size)
             target.add_field("masks", masks)
-
+            pseudo_flag = torch.zeros_like(classes, dtype=torch.uint8)
+            target.add_field("is_pseudo", pseudo_flag)  # add pseudo flag
         domain_labels = torch.ones_like(classes, dtype=torch.uint8) if self.is_source else torch.zeros_like(classes, dtype=torch.uint8)#source label:1,target label:0
         target.add_field("is_source", domain_labels)
 
