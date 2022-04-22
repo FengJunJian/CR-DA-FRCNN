@@ -231,7 +231,7 @@ class SW_DA_RCNN(GeneralizedRCNN):
         proposals, proposal_losses = self.rpn(images, features2, targets)#proposals：[BoxList(num_boxes=1000, image_width=1066, image_height=600, mode=xyxy)]
         da_losses = {}
         if self.roi_heads and self.da_heads:
-            flattenpooled_feat, proposals=self.roi_heads.box.forward_pooled_feat(features2, proposals, targets)#获取
+            flattenpooled_feat, proposals=self.roi_heads.box.forward_pooled_feat(features2, proposals, targets)#obtain the proposals and subsample
             d_pixel,feat_pixel,domain_p,feat,SW_loss=self.da_heads.forwardSW(features1, features2,targets)
             da_losses.update(SW_loss)
 
