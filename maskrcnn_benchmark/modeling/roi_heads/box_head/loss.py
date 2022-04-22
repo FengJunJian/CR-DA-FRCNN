@@ -36,11 +36,11 @@ class FastRCNNLossComputation(object):
         self.box_coder = box_coder
         self.cls_agnostic_bbox_reg = cls_agnostic_bbox_reg
 
-    def match_targets_to_proposals(self, proposal, target, is_source=True):#according to IOU
+    def match_targets_to_proposals(self, proposal, target, is_source=True,copied_fields=[]):#according to IOU
         match_quality_matrix = boxlist_iou(target, proposal)
-        matched_idxs = self.proposal_matcher(match_quality_matrix)
+        matched_idxs = self.proposal_matcher(match_quality_matrix)#TODO add a betweendthreshold for bg
         # Fast RCNN only need "labels" field for selecting the targets
-        target = target.copy_with_fields("labels")
+        target = target.copy_with_fields(copied_fields+["labels"])
         # get the targets corresponding GT for each proposal
         # NB: need to clamp the indices because we can have a single
         # GT in the image, and matched_idxs can be -2, which goes
@@ -55,10 +55,19 @@ class FastRCNNLossComputation(object):
         labels = []
         regression_targets = []
         domain_labels = []
+        pseudo_weights = []
         for proposals_per_image, targets_per_image in zip(proposals, targets):
             is_source = targets_per_image.get_field('is_source')
+
+            pseudo_flag = 'scores' in targets_per_image.extra_fields  # 'is_pseudo'
+            if pseudo_flag:
+                copied_fields = ['scores']
+            else:
+                copied_fields = []
+
             matched_targets = self.match_targets_to_proposals(
-                proposals_per_image, targets_per_image, is_source.any()#search the targets that matched the proposals
+                proposals_per_image, targets_per_image, is_source.any(),copied_fields
+                #search the targets that matched the proposals
             )
             matched_idxs = matched_targets.get_field("matched_idxs")
 
@@ -66,6 +75,7 @@ class FastRCNNLossComputation(object):
             labels_per_image = labels_per_image.to(dtype=torch.int64)
 
             # Label background (below the low threshold)
+
             bg_inds = matched_idxs == Matcher.BELOW_LOW_THRESHOLD
             labels_per_image[bg_inds] = 0
 
@@ -87,9 +97,14 @@ class FastRCNNLossComputation(object):
                 labels_per_image[:] = 0
 
             labels.append(labels_per_image)
+            if pseudo_flag:
+                pseudo_weights.append(matched_targets.get_field("scores"))
+            else:
+                pseudo_weights.append(torch.ones_like(labels_per_image,device=labels_per_image.device,dtype=torch.float32))
+
             regression_targets.append(regression_targets_per_image)
 
-        return labels, regression_targets, domain_labels
+        return labels, regression_targets, domain_labels, pseudo_weights
 
     def subsample(self, proposals, targets):
         """
@@ -102,20 +117,20 @@ class FastRCNNLossComputation(object):
             targets (list[BoxList])
         """
 
-        labels, regression_targets, domain_labels = self.prepare_targets(proposals, targets)
+        labels, regression_targets, domain_labels,pseudo_weights = self.prepare_targets(proposals, targets)
         sampled_pos_inds, sampled_neg_inds = self.fg_bg_sampler(labels)#sampler according to labels
 
         proposals = list(proposals)
         # add corresponding label and regression_targets information to the bounding boxes
-        for labels_per_image, regression_targets_per_image, proposals_per_image, domain_label_per_image in zip(
-            labels, regression_targets, proposals, domain_labels
+        for labels_per_image, regression_targets_per_image, proposals_per_image, domain_label_per_image,pseudo_weights_per_image in zip(
+            labels, regression_targets, proposals, domain_labels,pseudo_weights
         ):
             proposals_per_image.add_field("labels", labels_per_image)
             proposals_per_image.add_field(
                 "regression_targets", regression_targets_per_image
             )
             proposals_per_image.add_field("domain_labels", domain_label_per_image)
-
+            proposals_per_image.add_field("scores",pseudo_weights_per_image)
         # distributed sampled proposals, that were obtained on all feature maps
         # concatenated via the fg_bg_sampler, into individual feature map levels
         for img_idx, (pos_inds_img, neg_inds_img) in enumerate(
@@ -139,7 +154,7 @@ class FastRCNNLossComputation(object):
             targets (list[BoxList])
         """
 
-        labels, _, domain_labels = self.prepare_targets(proposals, targets, sample_for_da=True)#
+        labels, _, domain_labels,_ = self.prepare_targets(proposals, targets, sample_for_da=True)#
         sampled_pos_inds, sampled_neg_inds = self.fg_bg_sampler(labels)
 
         proposals = list(proposals)
@@ -187,6 +202,9 @@ class FastRCNNLossComputation(object):
         regression_targets = cat(
             [proposal.get_field("regression_targets") for proposal in proposals], dim=0
         )
+        pseudo_weights = cat(
+            [proposal.get_field("scores") for proposal in proposals], dim=0
+        )
 
         domain_masks = cat([proposal.get_field("domain_labels") for proposal in proposals], dim=0)
         domain_masks=domain_masks.bool()
@@ -194,9 +212,9 @@ class FastRCNNLossComputation(object):
         box_regression = box_regression[domain_masks, :]
         labels = labels[domain_masks]#only use the label from source domain
         regression_targets = regression_targets[domain_masks, :]
-
-        classification_loss = F.cross_entropy(class_logits, labels)
-
+        pseudo_weights=pseudo_weights[domain_masks]
+        classification_loss = F.cross_entropy(class_logits, labels,reduction='none')# pseudo weight
+        classification_loss = (classification_loss * pseudo_weights).mean()
         # get indices that correspond to the regression targets for
         # the corresponding ground truth labels, to be used with
         # advanced indexing
@@ -212,10 +230,12 @@ class FastRCNNLossComputation(object):
             box_regression[sampled_pos_inds_subset[:, None], map_inds],
             regression_targets[sampled_pos_inds_subset],
             #size_average=False,
-            reduction='sum',
+            reduction='none',#
             beta=1,
-        )
-        box_loss = box_loss / labels.numel()
+        )# pseudo weight
+        box_loss = (box_loss * pseudo_weights[sampled_pos_inds_subset,None])
+
+        box_loss = box_loss.sum() / labels.numel()
 
         return classification_loss, box_loss, domain_masks
 
@@ -224,6 +244,7 @@ def make_roi_box_loss_evaluator(cfg):
     matcher = Matcher(
         cfg.MODEL.ROI_HEADS.FG_IOU_THRESHOLD,
         cfg.MODEL.ROI_HEADS.BG_IOU_THRESHOLD,
+        pseudo_low_threshold=cfg.MODEL.ROI_HEADS.BG_IOU_PSEUDO_THRESHOLD,
         allow_low_quality_matches=False,
     )
 
