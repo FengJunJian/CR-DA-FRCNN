@@ -163,6 +163,7 @@ _C.MODEL.RPN.FG_IOU_THRESHOLD = 0.7
 # (anchor, gt box) pair to be a negative examples (IoU < BG_IOU_THRESHOLD
 # ==> negative RPN example)
 _C.MODEL.RPN.BG_IOU_THRESHOLD = 0.3
+_C.MODEL.RPN.BG_IOU_PSEUDO_THRESHOLD = 0.1 #for pseudo data
 # Total number of RPN examples per image
 _C.MODEL.RPN.BATCH_SIZE_PER_IMAGE = 256
 # Target fraction of foreground (positive) examples per RPN minibatch
@@ -197,6 +198,7 @@ _C.MODEL.ROI_HEADS.FG_IOU_THRESHOLD = 0.5
 # Overlap threshold for an RoI to be considered background
 # (class = 0 if overlap in [0, BG_IOU_THRESHOLD))
 _C.MODEL.ROI_HEADS.BG_IOU_THRESHOLD = 0.5
+_C.MODEL.ROI_HEADS.BG_IOU_PSEUDO_THRESHOLD = 0.1#bg_pseudo_low_threshold
 # Default weights on (dx, dy, dw, dh) for normalizing bbox regression targets
 # These are empirically chosen to approximately lead to unit variance targets
 _C.MODEL.ROI_HEADS.BBOX_REG_WEIGHTS = (10., 10., 5., 5.)
