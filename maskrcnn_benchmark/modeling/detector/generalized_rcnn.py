@@ -5,7 +5,7 @@ Implements the Generalized R-CNN framework
 
 import torch
 from torch import nn
-
+# from torchvision.models import resnet50
 from maskrcnn_benchmark.structures.image_list import to_image_list
 from ..backbone import build_backbone
 from ..rpn.rpn import build_rpn
