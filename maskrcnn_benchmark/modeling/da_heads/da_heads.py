@@ -297,6 +297,7 @@ class SWDomainModule(torch.nn.Module):
         ############################################################################################
         batch=img_features1.shape[0]
 
+
         SW_netD_pixelInputFeatures = self.grl_SW(img_features1)
         feat_pixel=None
         if self.lc:

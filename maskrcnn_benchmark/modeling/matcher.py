@@ -19,6 +19,7 @@ class Matcher(object):
 
     BELOW_LOW_THRESHOLD = -1
     BETWEEN_THRESHOLDS = -2
+
     BETWEEN_THRESHOLD_BG=-3
     def __init__(self, high_threshold, low_threshold, pseudo_low_threshold=0.1,allow_low_quality_matches=False):
         """
@@ -74,7 +75,7 @@ class Matcher(object):
         between_thresholds = (matched_vals >= self.low_threshold) & (
             matched_vals < self.high_threshold
         )
-        between_bg_pseudo_threshold = (self.pseudo_low_threshold < matched_vals)&(matched_vals < self.low_threshold)
+        between_bg_pseudo_threshold = (self.pseudo_low_threshold < matched_vals) & (matched_vals < self.low_threshold)
 
         matches[below_low_threshold] = Matcher.BELOW_LOW_THRESHOLD
         matches[between_thresholds] = Matcher.BETWEEN_THRESHOLDS

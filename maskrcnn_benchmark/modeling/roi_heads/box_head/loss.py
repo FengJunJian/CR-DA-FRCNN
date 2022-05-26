@@ -75,9 +75,21 @@ class FastRCNNLossComputation(object):
             labels_per_image = labels_per_image.to(dtype=torch.int64)
 
             # Label background (below the low threshold)
-
-            bg_inds = matched_idxs == Matcher.BELOW_LOW_THRESHOLD
+            # if pseudo_flag:
+            #     bg_inds = matched_idxs == Matcher.BETWEEN_THRESHOLD_BG
+            #     bg_inds = torch.nonzero(bg_inds)
+            # else:
+            #     bg_inds=(matched_idxs == Matcher.BELOW_LOW_THRESHOLD) |(matched_idxs == Matcher.BETWEEN_THRESHOLD_BG)
+            #     #bg_inds2= #TODO RuntimeError: CUDA error: device-side assert triggered
+            #     #bg_inds = torch.bitwise_or(bg_inds1,bg_inds2)
+            #     bg_inds=torch.nonzero(bg_inds)
+                # bg_inds = matched_idxs == Matcher.BELOW_LOW_THRESHOLD
+            bg_inds = (matched_idxs == Matcher.BELOW_LOW_THRESHOLD)
             labels_per_image[bg_inds] = 0
+
+
+                #print(bg_inds)
+
 
             # Label ignore proposals (between low and high thresholds)
             ignore_inds = matched_idxs == Matcher.BETWEEN_THRESHOLDS

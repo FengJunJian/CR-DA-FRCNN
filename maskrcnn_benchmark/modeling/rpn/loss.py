@@ -90,7 +90,11 @@ class RPNLossComputation(object):
             labels_per_image = labels_per_image.to(dtype=torch.float32)
 
             # Background (negative examples)
-            bg_indices = matched_idxs == Matcher.BELOW_LOW_THRESHOLD
+            # if pseudo_flag:
+            #     bg_indices = matched_idxs == Matcher.BETWEEN_THRESHOLD_BG
+            # else:
+            #     bg_indices = (matched_idxs == Matcher.BELOW_LOW_THRESHOLD)|(matched_idxs == Matcher.BETWEEN_THRESHOLD_BG)
+            bg_indices = (matched_idxs == Matcher.BELOW_LOW_THRESHOLD)
             labels_per_image[bg_indices] = 0
 
             # discard anchors that go out of the boundaries of the image

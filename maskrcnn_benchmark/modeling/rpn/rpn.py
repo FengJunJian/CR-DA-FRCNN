@@ -129,7 +129,7 @@ class RPNModule(nn.Module):
         """
 
         boxes=[]
-        boxFeatures=None
+        #boxFeatures=None
         proposal_loss= {}
         if targets:
             #for feature in features:
