@@ -15,11 +15,13 @@ from tqdm import tqdm
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from maskrcnn_benchmark.data.datasets.evaluation import evaluate
+from pprint import pprint
+from PIL import Image,ImageFont,ImageDraw
 
 def testbbox(cfg, model, numstr='', distributed=False,flagVisual=False):
     if distributed:
         model = model.module
-    torch.cuda.empty_cache()  # TODO check if it helps
+    torch.cuda.empty_cache()  #
     iou_types = ("bbox",)
     if cfg.MODEL.MASK_ON:
         iou_types = iou_types + ("segm",)
@@ -38,24 +40,18 @@ def testbbox(cfg, model, numstr='', distributed=False,flagVisual=False):
         result=None
         if os.path.exists(os.path.join(output_folder, 'predictions.pth')):
             predictions=torch.load(os.path.join(output_folder, 'predictions.pth'))
+            # Thscores =  0.219
+            # predictions = [boxlist[torch.where(boxlist.extra_fields['scores'] > Thscores)[0]] for boxlist in
+            #                predictions]
             extra_args = dict(
                 box_only=False if cfg.MODEL.RETINANET_ON else cfg.MODEL.RPN_ONLY,
                 iou_types=iou_types,
                 expected_results=cfg.TEST.EXPECTED_RESULTS,
                 expected_results_sigma_tol=cfg.TEST.EXPECTED_RESULTS_SIGMA_TOL,
             )
-            #data_loader_val.dataset.root
 
-            # for i in range(len(predictions)):
-            #     predictions[i] = boxlist_nms(
-            #         predictions[i], 0.1
-            #     )  ####nms
-            # predictions,dataset,output_folder,
-            result=myeval(predictions, data_loader_val.dataset, output_folder, **extra_args)
-            # evaluate(dataset = data_loader_val.dataset,
-            #          predictions=predictions,
-            #          output_folder=output_folder,
-            #          **extra_args)
+            result = myeval(predictions, data_loader_val.dataset, output_folder, **extra_args)
+
         else:
             result=inference(
             model,
@@ -72,15 +68,77 @@ def testbbox(cfg, model, numstr='', distributed=False,flagVisual=False):
 
         if flagVisual:
             predictions = torch.load(os.path.join(output_folder, 'predictions.pth'))
-            saveImgPath = os.path.join(output_folder, 'imgS')
+            saveImgPath = os.path.join(output_folder, 'img')
             if not os.path.exists(saveImgPath):
                 os.mkdir(saveImgPath)
-            visualization(predictions, data_loader_val.dataset, saveImgPath,cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES, 0.1,showScore=True)
+            visualization(predictions, data_loader_val.dataset, saveImgPath, cfg.MODEL.FCOS.NUM_CLASSES, 0.8, showScore=False)
+            #visualization(predictions, data_loader_val.dataset, saveImgPath,cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES, 0.95)
         synchronize()
     return results
 
+def cv2AddChineseText(img, text, position, textColor=(0, 255, 0), textSize=30):
+    if (isinstance(img, np.ndarray)):  # 判断是否OpenCV图片类型
+        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    # 创建一个可以在给定图像上绘图的对象
+    draw = ImageDraw.Draw(img)
+    # 字体的格式
+    fontStyle = ImageFont.truetype(
+        "simsun.ttc", textSize, encoding="utf-8")
+    # 绘制文本
+    draw.text(position, text, textColor, font=fontStyle)
+    # 转换回OpenCV格式
+    return cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
+
 
 def visualization(predictions,dataset,output_folder,num_color,threshold=0.5,showScore=False):#threshold=0.1,iou_type="bbox"
+    def write_detection(im, dets, thiness=5, GT_color=None, show_score=False):
+        '''
+        dets:xmin,ymin,xmax,ymax,score
+        '''
+        H, W, C = im.shape
+        for i in range(len(dets)):
+            rectangle_tmp = im.copy()
+            bbox = dets[i, :4].astype(np.int32)
+            class_ind = int(dets[i, 4])
+            # if class_ind==7:#ignore flying
+            #     continue
+            # score = dets[i, -1]
+            if GT_color:
+                color = GT_color
+            else:
+                color = colors[class_ind]
+
+            string = CLASS_NAMES[class_ind]
+            if show_score:
+                string += '%.4f' % (dets[i, 5])
+
+            # string = '%s' % (CLASSES[class_ind])
+            fontFace = cv2.FONT_HERSHEY_COMPLEX
+            fontScale = 1.5
+            # thiness = 2
+
+            text_size, baseline = cv2.getTextSize(string, fontFace, fontScale, thiness)
+            text_origin = (bbox[0] - 1, bbox[1])  # - text_size[1]
+            ###########################################putText
+            p1 = [text_origin[0] - 1, text_origin[1] + 1]
+            p2 = [text_origin[0] + text_size[0] + 1, text_origin[1] - text_size[1] - 2]
+            if p2[0] > W:
+                dw = p2[0] - W
+                p2[0] -= dw
+                p1[0] -= dw
+
+            rectangle_tmp = cv2.rectangle(rectangle_tmp, (p1[0], p1[1]),
+                                          (p2[0], p2[1]),
+                                          color, cv2.FILLED)
+            cv2.addWeighted(im, 0.7, rectangle_tmp, 0.3, 0, im)
+            im = cv2.rectangle(im, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, thiness)
+            # imt=im.copy()
+            im = cv2AddChineseText(im, string, (p1[0] + 1, p2[1] - 1), (0, 0, 0), )
+            # cv2.imshow('a',imt)
+            # cv2.waitKey()
+            # im = cv2.putText(im, string, (p1[0]+1,p1[1]-1),
+            #                  fontFace, fontScale, (0, 0, 0), thiness,lineType=-1)
+        return im
     #num_color = cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES
     hsv_tuples = [(x / num_color, 1., 1.)
                   for x in range(num_color)]
@@ -94,52 +152,8 @@ def visualization(predictions,dataset,output_folder,num_color,threshold=0.5,show
     for k,v in dataset.coco.cats.items():
         CLASS_NAMES[k]=v['name']
 
-    def write_detection(im, dets,thiness=5,GT_color=None,show_score=False):
-        H,W,C=im.shape
-        for i in range(len(dets)):
-            rectangle_tmp = im.copy()
-            bbox = dets[i, :4].astype(np.int32)
-            class_ind = int(dets[i, 4])
-            if class_ind==7:#ignore flying
-                continue
-            # score = dets[i, -1]
-            if GT_color:
-                color=GT_color
-            else:
-                color=colors[class_ind]
-
-            string = CLASS_NAMES[class_ind]
-            if show_score:
-                string+='%.4f'%(dets[i,5])
-
-            # string = '%s' % (CLASSES[class_ind])
-            fontFace = cv2.FONT_HERSHEY_COMPLEX
-            fontScale = 1.5
-            # thiness = 2
-
-            text_size, baseline = cv2.getTextSize(string, fontFace, fontScale, thiness)
-            text_origin = (bbox[0]-1, bbox[1])  # - text_size[1]
-        ###########################################putText
-            p1=[text_origin[0] - 1, text_origin[1] + 1]
-            p2=[text_origin[0] + text_size[0] + 1,text_origin[1] - text_size[1] - 2]
-            if p2[0]>W:
-                dw=p2[0]-W
-                p2[0]-=dw
-                p1[0]-=dw
-
-            rectangle_tmp=cv2.rectangle(rectangle_tmp, (p1[0], p1[1]),
-                               (p2[0], p2[1]),
-                               color, cv2.FILLED)
-            cv2.addWeighted(im, 0.7, rectangle_tmp, 0.3, 0, im)
-            im = cv2.rectangle(im, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, thiness)
-            im = cv2.putText(im, string, (p1[0]+1,p1[1]-1),
-                             fontFace, fontScale, (0, 0, 0), thiness,lineType=-1)
-        return im
-    #coco_results = []
     Imgroot=dataset.root
-
     for image_id, prediction in enumerate(tqdm(predictions)):
-        #print(image_id)
 
         if len(prediction) == 0:
             continue
@@ -176,21 +190,21 @@ def visualization(predictions,dataset,output_folder,num_color,threshold=0.5,show
         dets=prediction.bbox.numpy()
         dets = np.hstack([dets,np.reshape(prediction.get_field("labels").numpy(),[-1,1])])#labels
         dets = np.hstack([dets, np.reshape(prediction.get_field("scores").numpy(), [-1, 1])])  # scores
-        inds=np.where(dets[:,4]>threshold)[0]#label>0
+        inds=np.where(dets[:,4]>0)[0]#label>0
         dets=dets[inds,:]
-        inds=np.where(dets[:,5]>0)[0]#scores>threshold
+        inds=np.where(dets[:,5]>threshold)[0]#scores>threshold
         dets=dets[inds,:]
-        im=write_detection(im,dets,thiness=2,show_score=showScore)
+
+        im = write_detection(im, dets, thiness=2, show_score=showScore)
+        #im=write_detection(im,dets,thiness=2)
         #im=write_detection(im,gts,(0,0,255),thiness=2)
         #cv2.imshow('b',im)
         cv2.imwrite(os.path.join(output_folder,img_info['file_name']),im)
 
-
 def myeval(predictions,dataset,output_folder,**extra_args):
-    import pickle as plk
-    #
+    #from collections import Counter
     assert len(extra_args['iou_types'])==1
-    results, coco_results,coco_eval=evaluate(dataset=dataset,
+    results, coco_results,coco_eval,pr_c=evaluate(dataset=dataset,
              predictions=predictions,
              output_folder=output_folder,
              **extra_args)
@@ -198,31 +212,34 @@ def myeval(predictions,dataset,output_folder,**extra_args):
     savefile_path= os.path.join(output_folder, extra_args['iou_types'][0] + ".json")
     with open(savefile_path, "w") as f:
         json.dump(coco_boxes, f)
-    coco_dt = dataset.coco.loadRes(str(savefile_path)) if savefile_path else COCO()
-    coco_gt=dataset.coco
+    # coco_dt = dataset.coco.loadRes(str(savefile_path)) if savefile_path else COCO()
+    # coco_gt=dataset.coco
     # coco_eval = COCOeval(coco_gt, coco_dt, extra_args['iou_types'][0])
     # coco_eval.evaluate()
     # coco_eval.accumulate()
     # coco_eval.summarize()
-    #p_a1 = coco_eval.eval['precision'][0, :, 0, 0, 2]  # (T, R, K, A, M)
-    #r_a1 = coco_eval.eval['recall'][0, 0, 0, 2]  # (T, K, A, M)
-    # pr_array2 = res.eval['precision'][2, :, 0, 0, 2]
-    # pr_array3 = res.eval['precision'][4, :, 0, 0, 2]
-    #r_a1 = np.arange(0.0, 1.01, 0.01)
-    #pr_c=[]
-    pr_c={'total':coco_eval.eval}
-    for catId in coco_gt.getCatIds():#各类AP
-        coco_eval_c = COCOeval(coco_gt, coco_dt, extra_args['iou_types'][0])
-        coco_eval_c.params.catIds = [catId]
-        coco_eval_c.evaluate()
-        coco_eval_c.accumulate()
-        #coco_eval_c.summarize()
-        #pr_c.append(coco_eval_c.eval)
-        pr_c[catId]=coco_eval_c.eval
+    # pr_c={'total':coco_eval.eval}
 
-    if output_folder:
-        with open(os.path.join(output_folder,"coco_PR_all.pkl"),'wb') as f:
-            plk.dump(pr_c,f)
+    # if False:# deprecated
+    #     for catId in coco_gt.getCatIds():#各类AP
+    #         coco_eval_c = COCOeval(coco_gt, coco_dt, extra_args['iou_types'][0])
+    #         coco_eval_c.params.catIds = [catId]
+    #         coco_eval_c.evaluate()#对给定图像运行每个图像评估并将结果（字典列表）存储在 self.evalImgs, 可推理TP, TN, FP, FN
+    #         #self.evalImgs.dtm ,  self.evalImgs.gtm :用于计算Precision=TP/(detections:TP+FP) Recall=TP/(GT:TP+FN)
+    #         # self.evalImgs = [evaluateImg(imgId, catId, areaRng, maxDet)
+    #         #                  for catId in catIds
+    #         #                  for areaRng in p.areaRng
+    #         #                  for imgId in p.imgIds
+    #         # self.evalImgs.keys(): dict_keys(['image_id', 'category_id', 'aRng', 'maxDet',
+    #         #                                  'dtIds', 'gtIds', 'dtMatches', 'gtMatches',
+    #         #                                  'dtScores', 'gtIgnore', 'dtIgnore'])
+    #         coco_eval_c.accumulate()
+    #         #coco_eval_c.summarize()
+    #         pr_c[catId]=coco_eval_c.eval
+    #         #['precision'](p,r,class,area:['all', 'small', 'medium', 'large'] ,numDet)
+    # if output_folder:
+    #     with open(os.path.join(output_folder,"coco_PR_all.pkl"),'wb') as f:
+    #         plk.dump(pr_c,f)
         # with open(os.path.join(output_folder,"coco_results.txt"),'w') as f:
         #     for k,v in results.results.items():
         #         if isinstance(v,dict):
@@ -238,8 +255,8 @@ def myeval(predictions,dataset,output_folder,**extra_args):
     # T = len(p.iouThrs)
     # R = len(p.recThrs)
     # K = len(p.catIds) if p.useCats else 1
-    # A = len(p.areaRng)
-    # M = len(p.maxDets)
+    # A = len(p.areaRng)['all', 'small', 'medium', 'large']
+    # M = len(p.maxDets) #[1,10,100]
     # precision = -np.ones((T, R, K, A, M))  # -1 for the precision of absent categories
     # recall = -np.ones((T, K, A, M))#(iouThrs,catIds,areaRng,maxDets)
     # scores = -np.ones((T, R, K, A, M))
@@ -257,7 +274,6 @@ def myeval(predictions,dataset,output_folder,**extra_args):
     #  iouType    - ['segm'] set iouType to 'segm', 'bbox' or 'keypoints'
     #  iouType replaced the now DEPRECATED useSegm parameter.
     #  useCats    - [1] if true use category labels for evaluation
-
-    results = COCOResults((extra_args['iou_types'][0]))
-    results.update(coco_eval)
-    return results,coco_results,coco_eval
+    # results = COCOResults((extra_args['iou_types'][0]))
+    # results.update(coco_eval)
+    return results,coco_results,coco_eval,pr_c
