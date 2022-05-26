@@ -181,7 +181,14 @@ def main():
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     cfg.freeze()
-
+    # source_data_loader = make_data_loader(
+    #     cfg,
+    #     is_train=True,
+    #     is_source=True,
+    #     is_distributed=args.distributed,
+    #     start_iter=0,
+    #     has_unlabel=cfg.DATASETS.PSEUDO
+    # )
     output_dir = cfg.OUTPUT_DIR
     if output_dir:
         mkdir(output_dir)
