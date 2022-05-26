@@ -5,18 +5,15 @@ import torchvision
 from maskrcnn_benchmark.structures.bounding_box import BoxList
 from maskrcnn_benchmark.structures.segmentation_mask import SegmentationMask
 from maskrcnn_benchmark.structures.keypoint import PersonKeypoints
-
+from maskrcnn_benchmark.config import cfg
 import numpy as np
 min_keypoints_per_image = 10
-
 
 def _count_visible_keypoints(anno):
     return sum(sum(1 for v in ann["keypoints"][2::3] if v > 0) for ann in anno)
 
-
 def _has_only_empty_bbox(anno):
     return all(any(o <= 1 for o in obj["bbox"][2:]) for obj in anno)
-
 
 def has_valid_annotation(anno):
     # if it's empty, there is no annotation
@@ -35,7 +32,6 @@ def has_valid_annotation(anno):
         return True
     return False
 
-
 class COCODataset(torchvision.datasets.coco.CocoDetection):
     def __init__(
         self, ann_file, root, remove_images_without_annotations, transforms=None, is_source= True,is_pseudo=False,
@@ -46,7 +42,10 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
         super(COCODataset, self).__init__(root, ann_file)
         # sort indices for reproducible results
         self.ids = sorted(self.ids)
-        self.pseudo_threshold=0.1#0.9\0.8\0.7 adative learning
+        self.pseudo_threshold=cfg.DATASETS.PSEUDO_THRESHOLD#0.1#0.1#0.9\0.8\0.7 adative learning cfg
+        # print('######################################################')
+        # print('COCODataset:',self.pseudo_threshold)
+        # print('######################################################')
         # filter images without detection annotations
         if is_pseudo:
             assert predictionPath
@@ -65,17 +64,11 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
                         if len(inds)>0:
                             self.pseudo_label[img_id - 1]=boxes[inds]
                             ids.append(img_id)
-                    # else:
-                    #     ig_ids.append(img_id)
-                        #print(img_id)
                 else:
                     ann_ids = self.coco.getAnnIds(imgIds=img_id, iscrowd=None)
                     anno = self.coco.loadAnns(ann_ids)
                     if has_valid_annotation(anno):
                         ids.append(img_id)
-                    # else:
-                    #     ig_ids1.append(img_id)
-                        #print(img_id)
             self.ids = ids
 
         self.json_category_id_to_contiguous_id = {
@@ -102,7 +95,6 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
             # masks = [obj["segmentation"] for obj in anno]
             # masks = SegmentationMask(masks, img.size)
             # target.add_field("masks", masks)
-
         else:
             # filter crowd annotations
             # TODO might be better to add an extra field
@@ -125,7 +117,6 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
         domain_labels = torch.ones_like(classes, dtype=torch.uint8) if self.is_source else torch.zeros_like(classes, dtype=torch.uint8)#source label:1,target label:0
         target.add_field("is_source", domain_labels)
 
-
         if anno and "keypoints" in anno[0]:
             keypoints = [obj["keypoints"] for obj in anno]
             keypoints = PersonKeypoints(keypoints, img.size)
@@ -137,7 +128,6 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
         #     path = self.coco.loadImgs(img_id)[0]['file_name']
         #     print(idx, target,path)
         #     raise ValueError(path)
-
         if self._transforms is not None:
             img, target = self._transforms(img, target)
 

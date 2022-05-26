@@ -30,6 +30,7 @@ DATALOADER:
 DATASETS:
   PSEUDO_PATH: None
   PSEUDO: False
+  PSEUDO_THRESHOLD: 0.5
   TRAIN: ("ship_train_SeaShips_cocostyle",)
   SOURCE_TRAIN: ("ship_train_SeaShips_cocostyle",)
   PSEUDO_TRAIN: "ship_train_SMD_cocostyle"
