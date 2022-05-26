@@ -202,7 +202,7 @@ def visualization(predictions,dataset,output_folder,num_color,threshold=0.5,show
         cv2.imwrite(os.path.join(output_folder,img_info['file_name']),im)
 
 def myeval(predictions,dataset,output_folder,**extra_args):
-    #from collections import Counter
+
     assert len(extra_args['iou_types'])==1
     results, coco_results,coco_eval,pr_c=evaluate(dataset=dataset,
              predictions=predictions,
@@ -212,13 +212,6 @@ def myeval(predictions,dataset,output_folder,**extra_args):
     savefile_path= os.path.join(output_folder, extra_args['iou_types'][0] + ".json")
     with open(savefile_path, "w") as f:
         json.dump(coco_boxes, f)
-    # coco_dt = dataset.coco.loadRes(str(savefile_path)) if savefile_path else COCO()
-    # coco_gt=dataset.coco
-    # coco_eval = COCOeval(coco_gt, coco_dt, extra_args['iou_types'][0])
-    # coco_eval.evaluate()
-    # coco_eval.accumulate()
-    # coco_eval.summarize()
-    # pr_c={'total':coco_eval.eval}
 
     # if False:# deprecated
     #     for catId in coco_gt.getCatIds():#各类AP

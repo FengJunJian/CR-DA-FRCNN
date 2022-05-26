@@ -1,15 +1,17 @@
 import logging
 import tempfile
 import os
-import pickle as plk
 import torch
 from collections import OrderedDict
 from tqdm import tqdm
+import numpy as np
+import pickle as plk
+import json
+from collections import Counter
 
 from maskrcnn_benchmark.modeling.roi_heads.mask_head.inference import Masker
 from maskrcnn_benchmark.structures.bounding_box import BoxList
 from maskrcnn_benchmark.structures.boxlist_ops import boxlist_iou
-
 
 def do_coco_evaluation(
     dataset,
@@ -25,9 +27,6 @@ def do_coco_evaluation(
     results:AP contains AP,AP@.5,AP@.7,APs,APs,APl
     coco_results: detection box for each image
     '''
-    import numpy as np
-    #import matplotlib.pyplot as plt
-
     logger = logging.getLogger("maskrcnn_benchmark.inference")
 
     if box_only:
@@ -59,14 +58,15 @@ def do_coco_evaluation(
         coco_results['keypoints'] = prepare_for_coco_keypoint(predictions, dataset)
 
     results = COCOResults(*iou_types)#OrderedDict([('bbox', OrderedDict([('AP', -1), ('AP50', -1), ('AP75', -1), ('APs', -1), ('APm', -1), ('APl', -1)]))])
-    pr={}
+    pr_c={}
     logger.info("Evaluating predictions")
+
     for iou_type in iou_types:
         with tempfile.NamedTemporaryFile() as f:
             file_path = f.name
             if output_folder:
                 file_path = os.path.join(output_folder, iou_type + ".json")
-            res = evaluate_predictions_on_coco(
+            res,f_measure  = evaluate_predictions_on_coco(
                 dataset.coco, coco_results[iou_type], file_path, iou_type#  res.eval.keys  dict_keys(['params', 'counts', 'date', 'precision', 'recall', 'scores'])
             )
             # T = len(p.iouThrs)
@@ -78,53 +78,63 @@ def do_coco_evaluation(
             # recall = -np.ones((T, K, A, M))
             # scores = -np.ones((T, R, K, A, M))
             # res
-            ################PR curve
-            p_a1 = res.eval['precision'][0, :, 0, 0, 2]#(T, R, K, A, M)
-            r_a1 = res.eval['recall'][0, 0, 0, 2]#(T, K, A, M)
-            # pr_array2 = res.eval['precision'][2, :, 0, 0, 2]
-            # pr_array3 = res.eval['precision'][4, :, 0, 0, 2]
-            x = np.arange(0.0, 1.01, 0.01)
-            # plt.xlabel('recall')
-            # plt.ylabel('precision')
-            # plt.title('PR curve')
-            # plt.xlim(0, 1.0)
-            # plt.ylim(0, 1.01)
-            # plt.grid(True)
-            #
-            # plt.plot(x, p_a1, 'b-', label='IOU=0.5')
-            # # plt.plot(x, pr_array2, 'c-', label='IOU=0.6')
-            # # plt.plot(x, pr_array3, 'y-', label='IOU=0.7')
-            # plt.legend(loc="lower left")
-            # plt.show()
-            #############################################
-            pr[iou_type]={'precision':p_a1,'recall':r_a1}
+            if iou_type == "bbox":
+                dN = 0
+                GN = 0
+                TP = np.zeros_like(res.params.iouThrs)
+                for i in range(len(res.params.imgIds)):  # all small, medium,large
+                    # [[0, 10000000000.0], [0, 1024], [1024, 9216], [9216, 10000000000.0]]
+                    # print(i)
+                    data = res.evalImgs[i]
+                    if data is None:
+                        continue
+                    dN += len(data['dtIds'])
+                    GN += len(data['gtIds'])
+                    dM = np.nonzero(data['dtMatches'])[0]  # 各阈值匹配多少个
+                    if len(dM) == 0:
+                        continue
+                    TPC = Counter(dM)  # 统计各阈值的TP
+                    inds = np.array(list(TPC.keys()))
+                    tps = np.array(list(TPC.values()))
+                    TP[inds] += tps
+                P = TP / dN
+                R = TP / GN
+                AP = np.mean(res.eval['precision'][:, :, :, 0, 2], (1, 2))  # all, maxDet
+                APs = np.mean(res.eval['precision'][:, :, :, 1, 2], (1, 2))  # all, maxDet
+                APm = np.mean(res.eval['precision'][:, :, :, 2, 2], (1, 2))  # all, maxDet
+                APl = np.mean(res.eval['precision'][:, :, :, 3, 2], (1, 2))  # all, maxDet
+                pr_c['P'] = P.tolist()
+                pr_c['R'] = R.tolist()
+                pr_c['AP'] = AP.tolist()
+                pr_c['APs'] = APs.tolist()
+                pr_c['APm'] = APm.tolist()
+                pr_c['APl'] = APl.tolist()
+                pr_c['f_measure'] = f_measure
+                pr_c['iouThr'] = res.params.iouThrs.tolist()
+
+            p_a1 = res.eval['precision'][:, :, :, 0, 2]  # (T, R, K, A, M)
+            r_a1 = res.eval['recall'][:, :, 0, 2]  # (T, K, A, M)
+            pr_c[iou_type + 'pr'] = {'precision': p_a1.tolist(), 'recall': r_a1.tolist()}  # pr曲线
             results.update(res)
     logger.info(results)
     check_expected_results(results, expected_results, expected_results_sigma_tol)
     if output_folder:
-        with open(os.path.join(output_folder,"coco_PR"),'wb') as f:
-            plk.dump(res.eval,f)
-        with open(os.path.join(output_folder,"coco_results.txt"),'w') as f:
-            recalls=np.mean(res.eval['recall'][0,:,:,:],axis=0)#@.5 mean classes
-            for k,v in results.results.items():
-                if isinstance(v,dict):
-                    for k1,v1 in v.items():
-                        f.write(str(k1)+'\t'+str(v1)+'\n')
-            f.write('Recall@.5:(all,small,medium,large)|(1,10,100)\n')#recall      = -np.ones((T,K,A,M))
-            # self.maxDets = [1, 10, 100]
-            # self.areaRng = [[0 ** 2, 1e5 ** 2], [0 ** 2, 32 ** 2], [32 ** 2, 96 ** 2], [96 ** 2, 1e5 ** 2]]
-            # self.areaRngLbl = ['all', 'small', 'medium', 'large']
-            for r in recalls:
-                f.write(str(r) + '\n')
-            f.write('\n')
-        for iou_type in iou_types:
-            with open(os.path.join(output_folder,iou_type+"PR.txt"),'w') as f:
-                for d1,d2 in zip(x,p_a1):
-                    f.write(str(d1)+'\t'+str(d2)+'\n')
+        with open(os.path.join(output_folder, "coco_PR.pkl"), 'wb') as f:
+            plk.dump(res.eval, f)
+
+        inds_5 = np.where(res.params.iouThrs == 0.5)[0]
+        with open(os.path.join(output_folder, "coco_results.json"), 'w') as f:
+            aps = np.mean(res.eval['precision'][inds_5, :, :, 1, 2], (0, 1, 2))  # all, maxDet
+            apm = np.mean(res.eval['precision'][inds_5, :, :, 2, 2], (0, 1, 2))  # all, maxDet
+            apl = np.mean(res.eval['precision'][inds_5, :, :, 3, 2], (0, 1, 2))
+            ap50 = {"APs50": aps, "APm50": apm, "APl50": apl}
+            results.results[res.params.iouType].update(ap50)
+            metric1 = dict(results.results.items())
+            metric1.update(pr_c)
+            json.dump(metric1, f)
 
         torch.save(results, os.path.join(output_folder, "coco_results.pth"))
-    return results, coco_results,res
-
+    return results, coco_results,res, pr_c
 
 def prepare_for_coco_detection(predictions, dataset):
     # assert isinstance(dataset, COCODataset)
@@ -379,7 +389,7 @@ def evaluate_predictions_on_coco(
     coco_eval.evaluate()
     coco_eval.accumulate()
     coco_eval.summarize()
-
+    f_measure = compute_thresholds_for_classes(coco_eval)
     # T = len(p.iouThrs)
     # R = len(p.recThrs)
     # K = len(p.catIds) if p.useCats else 1
@@ -388,10 +398,36 @@ def evaluate_predictions_on_coco(
     # precision = -np.ones((T, R, K, A, M))  # -1 for the precision of absent categories
     # recall = -np.ones((T, K, A, M))
     # scores = -np.ones((T, R, K, A, M))
+    return coco_eval,f_measure
 
+def compute_thresholds_for_classes(coco_eval):
+    '''
+    The function is used to compute the thresholds corresponding to best f-measure.
+    The resulting thresholds are used in fcos_demo.py.
+    :param coco_eval:
+    :return:
+    '''
+    import numpy as np
+    # dimension of precision: [TxRxKxAxM]
+    precision = coco_eval.eval['precision']
+    # we compute thresholds with IOU being 0.5
+    precision = precision[0, :, :, 0, -1]
+    scores = coco_eval.eval['scores']
+    scores = scores[0, :, :, 0, -1]
 
-    return coco_eval
+    recall = np.linspace(0, 1, num=precision.shape[0])
+    recall = recall[:, None]
 
+    f_measure = (2 * precision * recall) / (np.maximum(precision + recall, 1e-6))
+    max_f_measure = f_measure.max(axis=0)
+    max_f_measure_inds = f_measure.argmax(axis=0)
+    scores = scores[max_f_measure_inds, range(len(max_f_measure_inds))]
+
+    print("Maximum f-measures for classes:")
+    print(list(max_f_measure))
+    print("Score thresholds for classes (used in demos for visualization purposes):")
+    print(list(scores))
+    return {'max_f_measure':list(max_f_measure),'Thscores':list(scores)}
 
 class COCOResults(object):
     METRICS = {
@@ -436,7 +472,6 @@ class COCOResults(object):
     def __repr__(self):
         # TODO make it pretty
         return repr(self.results)
-
 
 def check_expected_results(results, expected_results, sigma_tol):
     if not expected_results:
