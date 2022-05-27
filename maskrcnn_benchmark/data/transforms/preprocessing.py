@@ -1,11 +1,19 @@
 import cv2
 import numpy as np
-
+from PIL import Image
 def horizon_detect(img):
     if img is None:
         return 0,0,0
+    if isinstance(img,Image.Image):
+        #img=np.array(img)
+        imgray=np.array(img.convert('L'))
+    else:#default:cv2
+        if len(img.shape)==3:
+            imgray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+        else:
+            imgray=img
 
-    imgray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #imgray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     imgray = cv2.GaussianBlur(imgray, (3, 3), 0, 0)
     thesd = 0.0
     Mkernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
@@ -20,7 +28,7 @@ def horizon_detect(img):
     imgmask = cv2.reduce(dilatedgray, 1, cv2.REDUCE_AVG, cv2.CV_16S)  # //reduce to single column average
     row, col = imgray.shape
     # row = imgray.rows, col = imgray.cols;
-    kuan_hight = round(row / 20)
+    kuan_hight = round(row / 16)
 
     horizon_top = 0
     horizon_bottom = row - 1  # ;//区域上下界
