@@ -5,8 +5,12 @@ import torchvision
 from maskrcnn_benchmark.structures.bounding_box import BoxList
 from maskrcnn_benchmark.structures.segmentation_mask import SegmentationMask
 from maskrcnn_benchmark.structures.keypoint import PersonKeypoints
+from maskrcnn_benchmark.data.transforms.preprocessing import horizon_detect
 from maskrcnn_benchmark.config import cfg
 import numpy as np
+import os
+import cv2
+from tqdm import tqdm
 min_keypoints_per_image = 10
 
 def _count_visible_keypoints(anno):
@@ -53,7 +57,8 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
 
         if remove_images_without_annotations:
             ids = []
-            for img_id in self.ids:
+            print('{}: remove images without annotations......'.format('Pseudo' if is_pseudo else 'Source/Target'))
+            for img_id in tqdm(self.ids):
                 if is_pseudo:
                     boxes=self.pseudo_label[img_id - 1]
                     if len(boxes)>0:
@@ -61,8 +66,17 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
                         if isinstance(scores,torch.Tensor):
                             scores=scores.numpy()
                         inds=np.where(scores>self.pseudo_threshold)[0]
-                        if len(inds)>0:
-                            self.pseudo_label[img_id - 1]=boxes[inds]
+                        if len(inds) == 0:
+                            continue
+                        boxes=boxes[inds]#阈值筛选
+                        path = self.coco.loadImgs(img_id)[0]['file_name']
+                        img = cv2.imread(os.path.join(self.root, path))
+                        ymeans = boxes.bbox[:, 1::2].mean(dim=1)  # ymean
+                        horizonLineT, horizonLineB, horizonLine = horizon_detect(img)
+                        yinds = torch.where(ymeans - horizonLineT >= 0)[0]
+                        # target = target[yinds]
+                        if len(yinds)>0:
+                            self.pseudo_label[img_id - 1]=boxes[yinds]#水平线筛选
                             ids.append(img_id)
                 else:
                     ann_ids = self.coco.getAnnIds(imgIds=img_id, iscrowd=None)
@@ -70,6 +84,7 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
                     if has_valid_annotation(anno):
                         ids.append(img_id)
             self.ids = ids
+            print('{}: remaining ids is {}'.format('Pseudo' if is_pseudo else 'Source/Target',len(self.ids)))
 
         self.json_category_id_to_contiguous_id = {
             v: i + 1 for i, v in enumerate(self.coco.getCatIds())
@@ -87,10 +102,14 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
         #indices = [index] + random.choices(self.indices, k=3) # mixup
         if self.is_pseudo:
             target=self.pseudo_label[self.ids[idx] - 1]
-            target=target.resize(img.size)
+            target=target.resize(img.size).convert('xyxy')
             classes=target.get_field('labels')
             pseudo_flag=torch.ones_like(classes, dtype=torch.uint8)
             target.add_field("is_pseudo", pseudo_flag)  # add pseudo flag
+
+            # ymeans = (dets[:, 3] + dets[:, 1]) / 2
+            # yinds = np.where(ymeans - horizonLineT >= 0)[0]
+            # dets = dets[yinds, :]
 
             # masks = [obj["segmentation"] for obj in anno]
             # masks = SegmentationMask(masks, img.size)
