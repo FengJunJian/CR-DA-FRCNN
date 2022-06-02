@@ -6,6 +6,7 @@ Implements the Generalized R-CNN framework
 import torch
 from torch import nn
 # from torchvision.models import resnet50
+from torchvision.ops import MultiScaleRoIAlign,box_iou
 from maskrcnn_benchmark.structures.image_list import to_image_list
 from ..backbone import build_backbone
 from ..rpn.rpn import build_rpn
@@ -13,6 +14,8 @@ from ..roi_heads.roi_heads import build_roi_heads
 from ..da_heads.da_heads import build_da_heads
 from maskrcnn_benchmark.modeling.poolers import Pooler
 from collections import OrderedDict
+import cv2
+import os
 
 # import torchvision
 # torchvision.models.detection.FasterRCNN
@@ -311,6 +314,85 @@ class SW_DA_RCNN(GeneralizedRCNN):
             if len(t)>0:
                 t.add_field('featureROI',boxFeatures[0])# only for batch==1
         return boxes
+
+    def featureTarget_fb(self,images, targets=None,saveFolder='',imgnames=None):
+        """
+                Aiming to obtain the feature vectors of proposals.
+                For rpn, it generates the features of anchors.(using Pooler with resolution as same as ROI)
+                For ROI, it generates the features of proposals.
+                Arguments:
+                    images (list[Tensor] or ImageList): images to be processed
+                    targets (list[BoxList]): ground-truth boxes present in the image
+
+                Returns:
+                    proposals (list[BoxList]):the output from the rpn. The proposals contains the fields of features and other like `scores`, `labels` and `mask` (for Mask R-CNN models)
+                    rois (list[BoxList]):the output from the ROI. The format of rois is as same as the proposals. (optional)
+                """
+        if self.training and targets is None:  # model forward
+            raise ValueError("In training mode, targets should be passed")
+        assert len(images.image_sizes) == 1
+        i = 0
+        image_sizes = images.image_sizes
+        images = to_image_list(images)  # [1,3,608,1088]
+        #features = self.backbone(images.tensors)  # features [1,1024,38,68] extract the features of the backbone
+
+        features1 = self.backbone1(images.tensors)  # features ([2, 256, 152, 272])
+        features2 = self.backbone2(features1)  # [1,1024,38,68]
+        features2 = [features2]
+        proposals, proposal_losses = self.rpn(images, features2,
+                                              targets)
+
+        flattenpooled_feat, proposals = self.roi_heads.box.forward_pooled_feat(features2, proposals,
+                                                                               targets)  # obtain the proposals and subsample
+        d_pixel, feat_pixel, domain_p, feat, SW_loss = self.da_heads.forwardSW(features1, features2, targets)
+
+        x, result, detector_losses, da_ins_feas, da_ins_labels, class_logits = \
+            self.roi_heads.box.forward_predict(features2, flattenpooled_feat, proposals, feat_local=feat_pixel,
+                                               feat_global=feat, targets=targets)
+
+
+        fn = torch.mean(features2[i], dim=1)[i].cpu().detach().numpy()  # cen[0]
+        fnN = cv2.normalize(fn, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+        fnNM = cv2.applyColorMap(fnN, cv2.COLORMAP_JET)  # 变成伪彩图
+        # cv2.imshow('fnNM', fnNM)  # 变成伪彩图
+        cv2.imwrite(os.path.join(saveFolder, 'f' + imgnames[i]), fnNM)  # 变成伪彩图
+
+        feature_layers = ['P']
+        output_size = [8, 16]
+        RoIpooler = MultiScaleRoIAlign(feature_layers, output_size=output_size, sampling_ratio=0)
+        f = {k: features2[i] for i, k in enumerate(feature_layers)}
+        # for i in range(len(image_sizes)):
+        bboxes = [b.bbox for b in targets]
+        fg_num_boxes = sum([len(b) for b in bboxes])
+        bg_num_boxes = 0
+
+        if fg_num_boxes > 0:
+            iou = box_iou(bboxes[i], result[i].bbox)
+            _, boxeskeeps = torch.where(iou <= 0.01)  # 无iou交集为bg
+            inds = torch.randperm(len(boxeskeeps))
+            boxes_bg = []
+            bgboxes = result[i][boxeskeeps[inds[:fg_num_boxes * 2]]]
+            boxes_bg.append(bgboxes)
+            # for b in boxes:
+            #     bg_inds=torch.where(b.get_field('scores') < 0.1)[0]
+            #     boxes_bg.append(b[bg_inds])
+            bg_num_boxes += len(bgboxes)
+            bboxes += [b.bbox for b in boxes_bg]
+        pooledfeatures = RoIpooler(f, bboxes, image_sizes)
+        # x = RoIpooler(features, proposals)
+        fea_list = []
+
+        if len(pooledfeatures) == 0:
+            # return fea_list
+            fea_list.append(None)
+        else:
+            pi = pooledfeatures.cpu().detach().numpy()  # for p0
+            fea_dict = {}
+            fea_dict['fg'] = pi[:fg_num_boxes].mean(1)
+            fea_dict['bg'] = pi[fg_num_boxes:].mean(1)
+            fea_list.append(fea_dict)
+
+        return fea_list
 
     def featurePredict(self,images, targets=None):
         """
