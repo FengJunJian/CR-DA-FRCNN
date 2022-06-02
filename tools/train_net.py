@@ -13,6 +13,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from maskrcnn_benchmark.utils.env import setup_environment  # noqa F401 isort:skip
 import argparse
 import torch
+import json
 from maskrcnn_benchmark.config import cfg
 from maskrcnn_benchmark.data import make_data_loader
 from maskrcnn_benchmark.solver import make_lr_scheduler
@@ -180,6 +181,10 @@ def main():
 
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
+    if cfg.DATASETS.PSEUDO:
+        with open(os.path.join(cfg.DATASETS.PSEUDO_PATH, cfg.DATASETS.PSEUDO_TRAIN,'coco_results.json'),'r') as f:
+            coco_result=json.load(f)
+        cfg.DATASETS.PSEUDO_THRESHOLD=coco_result['f_measure']['Thscores'][0]
     cfg.freeze()
     # source_data_loader = make_data_loader(
     #     cfg,
