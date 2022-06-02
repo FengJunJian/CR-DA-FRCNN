@@ -6,6 +6,7 @@ from maskrcnn_benchmark.utils.miscellaneous import mkdir
 from maskrcnn_benchmark.data.datasets.evaluation.coco.coco_eval import evaluate_predictions_on_coco,prepare_for_coco_detection
 from maskrcnn_benchmark.structures.boxlist_ops import boxlist_nms
 from maskrcnn_benchmark.data.datasets.evaluation.coco.coco_eval import COCOResults
+from maskrcnn_benchmark.data.transforms.preprocessing import horizon_detect
 import os
 import json
 import colorsys
@@ -36,6 +37,7 @@ def testbbox(cfg, model, numstr='', distributed=False,flagVisual=False):
             output_folders[idx] = output_folder
     data_loaders_val = make_data_loader(cfg, is_train=False, is_distributed=distributed)
     results=[]
+    Thscores=0.5
     for output_folder, dataset_name, data_loader_val in zip(output_folders, dataset_names, data_loaders_val):
         result=None
         if os.path.exists(os.path.join(output_folder, 'predictions.pth')):
@@ -51,7 +53,7 @@ def testbbox(cfg, model, numstr='', distributed=False,flagVisual=False):
             )
 
             result = myeval(predictions, data_loader_val.dataset, output_folder, **extra_args)
-
+            Thscores = result[3]['f_measure']['Thscores'][0]  # 0.219
         else:
             result=inference(
             model,
@@ -64,6 +66,7 @@ def testbbox(cfg, model, numstr='', distributed=False,flagVisual=False):
             expected_results_sigma_tol=cfg.TEST.EXPECTED_RESULTS_SIGMA_TOL,
             output_folder=output_folder,
         )
+            Thscores = result[3]['f_measure']['Thscores'][0]  # 0.219
         results.append(result)
 
         if flagVisual:
@@ -71,7 +74,7 @@ def testbbox(cfg, model, numstr='', distributed=False,flagVisual=False):
             saveImgPath = os.path.join(output_folder, 'img')
             if not os.path.exists(saveImgPath):
                 os.mkdir(saveImgPath)
-            visualization(predictions, data_loader_val.dataset, saveImgPath, cfg.MODEL.FCOS.NUM_CLASSES, 0.8, showScore=False)
+            visualization(predictions, data_loader_val.dataset, saveImgPath, cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES, Thscores, showScore=False)
             #visualization(predictions, data_loader_val.dataset, saveImgPath,cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES, 0.95)
         synchronize()
     return results
@@ -110,7 +113,7 @@ def visualization(predictions,dataset,output_folder,num_color,threshold=0.5,show
 
             string = CLASS_NAMES[class_ind]
             if show_score:
-                string += '%.4f' % (dets[i, 5])
+                string += '%.3f' % (dets[i, 5])
 
             # string = '%s' % (CLASSES[class_ind])
             fontFace = cv2.FONT_HERSHEY_COMPLEX
@@ -150,7 +153,12 @@ def visualization(predictions,dataset,output_folder,num_color,threshold=0.5,show
     CLASS_NAMES=[None]*num_color#cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES
     CLASS_NAMES[0]='__background__'
     for k,v in dataset.coco.cats.items():
-        CLASS_NAMES[k]=v['name']
+        if k > 0:
+            name = '水面目标'
+        else:
+            name = '__background__'
+        # CLASS_NAMES[k]=v['name']
+        CLASS_NAMES[k] = name
 
     Imgroot=dataset.root
     for image_id, prediction in enumerate(tqdm(predictions)):
@@ -190,6 +198,19 @@ def visualization(predictions,dataset,output_folder,num_color,threshold=0.5,show
         dets=prediction.bbox.numpy()
         dets = np.hstack([dets,np.reshape(prediction.get_field("labels").numpy(),[-1,1])])#labels
         dets = np.hstack([dets, np.reshape(prediction.get_field("scores").numpy(), [-1, 1])])  # scores
+
+        horizonLineT, horizonLineB, horizonLine = horizon_detect(im)
+        horizonLineT = round(horizonLineT)
+        #horizonLineB = round(horizonLineB)
+        #horizonLine = round(horizonLine)
+        im = cv2.line(im, (0, int(horizonLine)), (im.shape[1] - 1, int(horizonLine)), (0, 0, 255), 2)
+        # im = cv2.line(im, (0, horizonLineT), (im.shape[1] - 1, horizonLineT), (0, 255, 255), 2)#水平线
+        # cv2.imshow('b',imgT)
+        # cv2.waitKey()
+        ymeans = (dets[:, 3] + dets[:, 1]) / 2
+        yinds = np.where(ymeans - horizonLineT >= 0)[0]
+        dets = dets[yinds, :]
+
         inds=np.where(dets[:,4]>0)[0]#label>0
         dets=dets[inds,:]
         inds=np.where(dets[:,5]>threshold)[0]#scores>threshold
