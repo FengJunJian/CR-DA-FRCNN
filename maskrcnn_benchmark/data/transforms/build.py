@@ -12,17 +12,18 @@ from PIL import Image
 import numpy as np
 import torch
 def build_transforms(cfg, is_train=True):
-
     if is_train:
         min_size = cfg.INPUT.MIN_SIZE_TRAIN
         max_size = cfg.INPUT.MAX_SIZE_TRAIN
         flip_prob = 0.5  # cfg.INPUT.FLIP_PROB_TRAIN
         other_flip_prob=0.1
+        oneOf_prob=1.0
     else:
         min_size = cfg.INPUT.MIN_SIZE_TEST
         max_size = cfg.INPUT.MAX_SIZE_TEST
         flip_prob = 0.0
         other_flip_prob=0.0
+        oneOf_prob=0.0
 
     to_bgr255 = cfg.INPUT.TO_BGR255
     normalize_transform = T.Normalize(
@@ -32,9 +33,17 @@ def build_transforms(cfg, is_train=True):
     Talbu = A.Compose([
         #A.Resize(int(H / 2), int(W / 2)),
         A.Blur(p=other_flip_prob),
-        A.RandomFog(fog_coef_upper=0.5,p=other_flip_prob),
-        A.RandomRain(p=other_flip_prob),
-        A.ShiftScaleRotate(shift_limit=0, rotate_limit=0, scale_limit=0.6, border_mode=cv2.BORDER_CONSTANT,p=flip_prob),
+        A.OneOf([
+            A.RandomFog(fog_coef_upper=0.5),
+            A.RandomRain()]
+            ,p=oneOf_prob),
+
+        A.ShiftScaleRotate(shift_limit=0, rotate_limit=0, scale_limit=0.6, border_mode=cv2.BORDER_CONSTANT)
+
+        # A.RandomFog(fog_coef_upper=0.5, p=other_flip_prob),
+        # A.RandomRain(p=other_flip_prob),
+        # A.ShiftScaleRotate(shift_limit=0, rotate_limit=0, scale_limit=0.6, border_mode=cv2.BORDER_CONSTANT, p=flip_prob)
+
         # A.Downscale(always_apply=True)#下采样
         # A.Cutout(8)
         # A.RandomFog(p=1.0),#雾True霾
@@ -61,8 +70,8 @@ class MulTransform(object):
         self.Ttorch=Ttorch
         self.mode="xyxy"
         self.albuformat="pascal_voc"
-    def __call__(self, image, target):
-        if self.Talbu:
+    def __call__(self, image, target,Talbu_force=False):
+        if self.Talbu and Talbu_force:
             #albuformat = "pascal_voc"
             if target.mode!=self.mode:
                 # if target.mode=="xyxy":
@@ -104,7 +113,6 @@ class MulTransform(object):
             #albuDict['masks'] = immask
 
             augmented=self.Talbu(**albuDict)
-
             bboxes=augmented["bboxes"]
 
             # labels = augmented["labels"]
