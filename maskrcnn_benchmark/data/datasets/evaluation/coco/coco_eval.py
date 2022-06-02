@@ -411,7 +411,9 @@ def compute_thresholds_for_classes(coco_eval):
     # dimension of precision: [TxRxKxAxM]
     precision = coco_eval.eval['precision']
     # we compute thresholds with IOU being 0.5
-    precision = precision[0, :, :, 0, -1]
+    #iouInds=np.where(coco_eval.params.iouThrs==0.5)[0]
+    iouInds=[0]
+    precision = precision[iouInds[0], :, :, 0, -1]
     scores = coco_eval.eval['scores']
     scores = scores[0, :, :, 0, -1]
 

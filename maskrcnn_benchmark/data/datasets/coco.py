@@ -110,7 +110,6 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
             # ymeans = (dets[:, 3] + dets[:, 1]) / 2
             # yinds = np.where(ymeans - horizonLineT >= 0)[0]
             # dets = dets[yinds, :]
-
             # masks = [obj["segmentation"] for obj in anno]
             # masks = SegmentationMask(masks, img.size)
             # target.add_field("masks", masks)
