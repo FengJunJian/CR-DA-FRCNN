@@ -46,6 +46,7 @@ _C.MODEL.SW.DA_GRL_WEIGHT=1.0
 _C.MODEL.SW.SW_WEIGHT=1.0
 _C.MODEL.SW.SW_ROIBoxHead=True
 _C.MODEL.SW_ON=True
+
 # -----------------------------------------------------------------------------
 # Parameters of ICR_CCR
 # -----------------------------------------------------------------------------
@@ -81,6 +82,7 @@ _C.DATASETS = CN()
 _C.DATASETS.PSEUDO_PATH=None #prediction.pth
 _C.DATASETS.PSEUDO=False
 _C.DATASETS.PSEUDO_THRESHOLD=0.5
+_C.DATASETS.PSEUDO_WEIGHT=0.1
 _C.DATASETS.TRAIN = ()
 _C.DATASETS.SOURCE_TRAIN = ()
 _C.DATASETS.TARGET_TRAIN = None
