@@ -35,7 +35,7 @@ def build_transforms(cfg, is_train=True):
         A.Blur(p=other_flip_prob),
         A.OneOf([
             A.RandomFog(fog_coef_upper=0.5),
-            A.RandomRain()]
+            A.RandomRain(),]
             ,p=oneOf_prob),
 
         A.ShiftScaleRotate(shift_limit=0, rotate_limit=0, scale_limit=0.6, border_mode=cv2.BORDER_CONSTANT)
@@ -140,7 +140,6 @@ class MulTransform(object):
             if isinstance(image,np.ndarray):
                 image=cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
                 image=Image.fromarray(image)
-
             image, target = self.Ttorch(image, target)
         #_C.INPUT.PIXEL_MEAN = [102.9801, 115.9465, 122.7717]
         # Values to be used for image normalization
