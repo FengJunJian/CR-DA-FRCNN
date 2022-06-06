@@ -1,10 +1,42 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 from collections import OrderedDict
 import logging
-
+import numpy as np
 import torch
 
 from maskrcnn_benchmark.utils.imports import import_file
+
+def align_state_dicts_counts_str(model_k,loaded_k,match_matrix):
+    len1 = len(model_k)
+    len2 = len(loaded_k)
+    diff = abs(len2 - len1)
+    match_num = 0
+    if model_k.endswith(loaded_k):
+        match_matrix.append(len(loaded_k))
+    elif len1 > len2:
+        str2 = '0' * diff + loaded_k
+        str1 = loaded_k
+        str1 = np.array(list(str1[::-1]))
+        str2 = np.array(list(str2[::-1]))
+        bool_arrs = (str1 == str2)
+        for bool_arr in bool_arrs:
+            if bool_arr:
+                match_num += 1
+            else:
+                match_matrix.append(match_num)
+                break
+    else:  # len2>=len1:
+        str2 = loaded_k
+        str1 = '0' * diff + model_k
+        str1 = np.array(list(str1[::-1]))
+        str2 = np.array(list(str2[::-1]))
+        bool_arrs = (str1 == str2)
+        for bool_arr in bool_arrs:
+            if bool_arr:
+                match_num += 1
+            else:
+                match_matrix.append(match_num)
+                break
 
 
 def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
@@ -30,6 +62,7 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
 
     for i in current_keys:
         for j in loaded_keys:
+            # align_state_dicts_counts_str(i, j, match_matrix)
             if i.endswith(j):
                 match_matrix.append(len(j))
             else:
@@ -141,9 +174,9 @@ def align_and_update_state_dicts_pretrain(model_state_dict, loaded_state_dict):
                 key + " is not loaded."
             )
 
-def strip_prefix_if_present(state_dict, prefix):
+def strip_prefix_if_present(state_dict, prefix,partial_replace=False):
     keys = sorted(state_dict.keys())
-    if not all(key.startswith(prefix) for key in keys):
+    if not all(key.startswith(prefix) for key in keys) and not partial_replace:
         return state_dict
     stripped_state_dict = OrderedDict()
     for key, value in state_dict.items():
@@ -157,6 +190,8 @@ def load_state_dict(model, loaded_state_dict,pretrain=False):
     # DataParallel or DistributedDataParallel during serialization,
     # remove the "module" prefix before performing the matching
     loaded_state_dict = strip_prefix_if_present(loaded_state_dict, prefix="module.")
+    loaded_state_dict = strip_prefix_if_present(loaded_state_dict, prefix="backbone.body.",partial_replace=True)#SW
+
     if pretrain:
         align_and_update_state_dicts_pretrain(model_state_dict, loaded_state_dict)
     else:
