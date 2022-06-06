@@ -49,6 +49,7 @@ class RPNLossComputation(object):
             cfg.MODEL.RETINANET.LOSS_GAMMA,
             cfg.MODEL.RETINANET.LOSS_ALPHA
         )
+        self.cfg=cfg
 
     def match_targets_to_anchors(self, anchor, target, copied_fields=[]):
         match_quality_matrix = boxlist_iou(target, anchor)#compute the iou
@@ -68,10 +69,14 @@ class RPNLossComputation(object):
         labels = []
         regression_targets = []
         masks = [] #masks for source domain data
+        masks_pseudo=[]
         pseudo_weights=[]
         for anchors_per_image, targets_per_image in zip(anchors, targets):
             is_source = targets_per_image.get_field('is_source')
+            is_pseudo = targets_per_image.get_field('is_pseudo')
+            mask_per_image_pseudo = is_pseudo.new_ones(1, dtype=torch.uint8) if is_pseudo.any() else is_pseudo.new_zeros(1,dtype=torch.uint8)
             mask_per_image = is_source.new_ones(1, dtype=torch.uint8) if is_source.any() else is_source.new_zeros(1, dtype=torch.uint8)
+            masks_pseudo.append(mask_per_image_pseudo)
             masks.append(mask_per_image)
             if not is_source.any():
                 continue
@@ -113,7 +118,7 @@ class RPNLossComputation(object):
 
             labels.append(labels_per_image)
             if pseudo_flag:
-                pseudo_weights.append(matched_targets.get_field("scores"))
+                pseudo_weights.append(matched_targets.get_field("scores")*self.cfg.DATASETS.PSEUDO_WEIGHT)#0.1
             else:
                 pseudo_weights.append(torch.ones_like(labels_per_image,device=labels_per_image.device,dtype=torch.float32))
             #pseudo_scores.append()

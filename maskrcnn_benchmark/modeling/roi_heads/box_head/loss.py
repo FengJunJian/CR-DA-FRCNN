@@ -11,7 +11,6 @@ from maskrcnn_benchmark.modeling.balanced_positive_negative_sampler import (
 )
 from maskrcnn_benchmark.modeling.utils import cat
 
-
 class FastRCNNLossComputation(object):
     """
     Computes the loss for Faster R-CNN.
@@ -23,7 +22,8 @@ class FastRCNNLossComputation(object):
         proposal_matcher, 
         fg_bg_sampler, 
         box_coder, 
-        cls_agnostic_bbox_reg=False
+        cls_agnostic_bbox_reg=False,
+        cfg=None
     ):
         """
         Arguments:
@@ -35,6 +35,7 @@ class FastRCNNLossComputation(object):
         self.fg_bg_sampler = fg_bg_sampler
         self.box_coder = box_coder
         self.cls_agnostic_bbox_reg = cls_agnostic_bbox_reg
+        self.cfg=cfg
 
     def match_targets_to_proposals(self, proposal, target, is_source=True,copied_fields=[]):#according to IOU
         match_quality_matrix = boxlist_iou(target, proposal)
@@ -86,11 +87,7 @@ class FastRCNNLossComputation(object):
                 # bg_inds = matched_idxs == Matcher.BELOW_LOW_THRESHOLD
             bg_inds = (matched_idxs == Matcher.BELOW_LOW_THRESHOLD)
             labels_per_image[bg_inds] = 0
-
-
                 #print(bg_inds)
-
-
             # Label ignore proposals (between low and high thresholds)
             ignore_inds = matched_idxs == Matcher.BETWEEN_THRESHOLDS
             labels_per_image[ignore_inds] = -1  # -1 is ignored by sampler
@@ -110,7 +107,7 @@ class FastRCNNLossComputation(object):
 
             labels.append(labels_per_image)
             if pseudo_flag:
-                pseudo_weights.append(matched_targets.get_field("scores"))
+                pseudo_weights.append(matched_targets.get_field("scores")*self.cfg.DATASETS.PSEUDO_WEIGHT)
             else:
                 pseudo_weights.append(torch.ones_like(labels_per_image,device=labels_per_image.device,dtype=torch.float32))
 
@@ -273,7 +270,8 @@ def make_roi_box_loss_evaluator(cfg):
         matcher, 
         fg_bg_sampler, 
         box_coder, 
-        cls_agnostic_bbox_reg
+        cls_agnostic_bbox_reg,
+        cfg=cfg
     )
 
     return loss_evaluator
