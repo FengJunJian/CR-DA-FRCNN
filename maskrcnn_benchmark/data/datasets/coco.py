@@ -69,10 +69,13 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
                         if len(inds) == 0:
                             continue
                         boxes=boxes[inds]#阈值筛选
-                        path = self.coco.loadImgs(img_id)[0]['file_name']
-                        img = cv2.imread(os.path.join(self.root, path))
                         ymeans = boxes.bbox[:, 1::2].mean(dim=1)  # ymean
-                        horizonLineT, horizonLineB, horizonLine = horizon_detect(img)
+                        if True:
+                            path = self.coco.loadImgs(img_id)[0]['file_name']
+                            img = cv2.imread(os.path.join(self.root, path))
+                            horizonLineT, horizonLineB, horizonLine = horizon_detect(img)
+                        else:
+                            horizonLineT=0
                         yinds = torch.where(ymeans - horizonLineT >= 0)[0]
                         # target = target[yinds]
                         if len(yinds)>0:
@@ -147,7 +150,10 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
         #     print(idx, target,path)
         #     raise ValueError(path)
         if self._transforms is not None:
-            img, target = self._transforms(img, target)
+            if self.is_pseudo:
+                img, target = self._transforms(img, target,Talbu_force=True)
+            else:
+                img, target = self._transforms(img, target)
 
         return img, target, idx
 
