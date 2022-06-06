@@ -56,7 +56,7 @@ def train(cfg, local_rank, distributed):
     if "catalog:" in cfg.MODEL.WEIGHT:
         extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT,pretrain=True)#load the pretrained model
     else:
-        extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT, pretrain=False,skit=True)
+        extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT, pretrain=False,skit=True,)
     arguments.update(extra_checkpoint_data)
     arguments["iteration"]=0
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
@@ -138,9 +138,7 @@ def train(cfg, local_rank, distributed):
             arguments,
             cfg,
         )
-
     return model
-
 
 def main():
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Training")
