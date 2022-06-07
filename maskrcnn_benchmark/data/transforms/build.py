@@ -17,13 +17,13 @@ def build_transforms(cfg, is_train=True):
         max_size = cfg.INPUT.MAX_SIZE_TRAIN
         flip_prob = 0.5  # cfg.INPUT.FLIP_PROB_TRAIN
         other_prob=0.4
-        oneOf_prob=1.0
+        #oneOf_prob=1.0
     else:
         min_size = cfg.INPUT.MIN_SIZE_TEST
         max_size = cfg.INPUT.MAX_SIZE_TEST
         flip_prob = 0.0
         other_prob=0.0
-        oneOf_prob=0.0
+        #oneOf_prob=0.0
 
     to_bgr255 = cfg.INPUT.TO_BGR255
     normalize_transform = T.Normalize(
