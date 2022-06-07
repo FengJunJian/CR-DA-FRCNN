@@ -16,13 +16,13 @@ def build_transforms(cfg, is_train=True):
         min_size = cfg.INPUT.MIN_SIZE_TRAIN
         max_size = cfg.INPUT.MAX_SIZE_TRAIN
         flip_prob = 0.5  # cfg.INPUT.FLIP_PROB_TRAIN
-        other_flip_prob=0.1
+        other_prob=0.4
         oneOf_prob=1.0
     else:
         min_size = cfg.INPUT.MIN_SIZE_TEST
         max_size = cfg.INPUT.MAX_SIZE_TEST
         flip_prob = 0.0
-        other_flip_prob=0.0
+        other_prob=0.0
         oneOf_prob=0.0
 
     to_bgr255 = cfg.INPUT.TO_BGR255
@@ -32,20 +32,24 @@ def build_transforms(cfg, is_train=True):
 
     Talbu = A.Compose([
         #A.Resize(int(H / 2), int(W / 2)),
-        A.Blur(p=other_flip_prob),
-        A.OneOf([
-            A.RandomFog(fog_coef_upper=0.5),
-            A.RandomRain(),]
-            ,p=oneOf_prob),
+        A.Blur(p=other_prob),
+        A.GaussianBlur(p=other_prob),
+        A.OneOf(
+            [
+        A.RandomFog(fog_coef_upper=0.5),
+        A.RandomRain(),
+        A.RandomSunFlare(flare_roi=(0, 0, 1, 0.3), num_flare_circles_lower=1, num_flare_circles_upper=5, src_radius=300,)
+        ],p=other_prob),
+        A.Cutout(num_holes=16,max_h_size=16,max_w_size=16,p=other_prob),
+        A.ShiftScaleRotate(shift_limit=0, rotate_limit=0, scale_limit=0.6, border_mode=cv2.BORDER_CONSTANT,p=other_prob)
 
-        A.ShiftScaleRotate(shift_limit=0, rotate_limit=0, scale_limit=0.6, border_mode=cv2.BORDER_CONSTANT)
-
-        # A.RandomFog(fog_coef_upper=0.5, p=other_flip_prob),
-        # A.RandomRain(p=other_flip_prob),
         # A.ShiftScaleRotate(shift_limit=0, rotate_limit=0, scale_limit=0.6, border_mode=cv2.BORDER_CONSTANT, p=flip_prob)
-
         # A.Downscale(always_apply=True)#下采样
         # A.Cutout(8)
+        # A.RandomFog(fog_coef_upper=0.5, p=other_prob),
+        # A.RandomRain(p=other_prob),
+        # A.RandomSunFlare(flare_roi=(0, 0, 1, 0.3), num_flare_circles_lower=1, num_flare_circles_upper=5, src_radius=300,
+        #                  p=other_prob)
         # A.RandomFog(p=1.0),#雾True霾
         # A.RandomRain(p=1.0)#下雨
         # A.RandomShadow(p=1.0)#阴影
@@ -70,7 +74,7 @@ class MulTransform(object):
         self.Ttorch=Ttorch
         self.mode="xyxy"
         self.albuformat="pascal_voc"
-    def __call__(self, image, target,Talbu_force=False):
+    def __call__(self, image, target,Talbu_force=True):
         if self.Talbu and Talbu_force:
             #albuformat = "pascal_voc"
             if target.mode!=self.mode:
