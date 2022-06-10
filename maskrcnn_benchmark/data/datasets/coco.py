@@ -40,7 +40,7 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
     def __init__(
         self, ann_file, root, remove_images_without_annotations, transforms=None, is_source= True,is_pseudo=False,
     predictionPath=None):
-        from pycocotools.coco import COCO
+        #from pycocotools.coco import COCO
         # ann_file = "E:\SeaShips_SMD/ship_test_SMD_cocostyle.json"
         # predictionPath = "E:\DA1\SW\logSSToSMDship\inference20000\ship_test_SMD_cocostyle/predictions.pth"
         super(COCODataset, self).__init__(root, ann_file)
@@ -70,7 +70,7 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
                             continue
                         boxes=boxes[inds]#阈值筛选
                         ymeans = boxes.bbox[:, 1::2].mean(dim=1)  # ymean
-                        if True:
+                        if True:#TODO may move to getitem
                             path = self.coco.loadImgs(img_id)[0]['file_name']
                             img = cv2.imread(os.path.join(self.root, path))
                             horizonLineT, horizonLineB, horizonLine = horizon_detect(img)
