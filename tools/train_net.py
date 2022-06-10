@@ -182,8 +182,18 @@ def main():
     if cfg.DATASETS.PSEUDO:
         with open(os.path.join(cfg.DATASETS.PSEUDO_PATH, cfg.DATASETS.PSEUDO_TRAIN,'coco_results.json'),'r') as f:
             coco_result=json.load(f)
-        cfg.DATASETS.PSEUDO_THRESHOLD=coco_result['f_measure']['Thscores'][0]
+        thre=coco_result['f_measure']['Thscores'][0]
+        if thre<0.2:
+            thre=0.2
+        elif thre>0.9:
+            thre=0.9
+        cfg.DATASETS.PSEUDO_THRESHOLD=thre
+    # from tensorboardX import SummaryWriter
+    # writerT = SummaryWriter(os.path.join('even'))
+    # writerT.add_hparams(dict(cfg.DATASETS),{"AP":1})
     cfg.freeze()
+    # print(cfg.DATASETS)
+    # return 1
     # source_data_loader = make_data_loader(
     #     cfg,
     #     is_train=True,
@@ -207,9 +217,9 @@ def main():
     logger.info("\n" + collect_env_info())
 
     logger.info("Loaded configuration file {}".format(args.config_file))
-    with open(args.config_file, "r") as cf:
-        config_str = "\n" + cf.read()
-        logger.info(config_str)
+    # with open(args.config_file, "r") as cf:
+    #     config_str = "\n" + cf.read()
+    #     logger.info(config_str)
     logger.info("Running with config:\n{}".format(cfg))
 
     model = train(cfg, args.local_rank, args.distributed)

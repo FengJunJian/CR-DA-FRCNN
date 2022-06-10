@@ -134,13 +134,13 @@ def do_train(
                     #print(k,v)
                     writerT.add_scalar(tag=k, scalar_value=v, global_step=iteration)
                     writerT.flush()
+                writerT.add_hparams(dict(cfg.DATASETS), {"AP50":testResult[0][0].results['bbox']['AP50']})
+                writerT.flush()
             except:
                 print('Error:testResult is empty!')
             model.train()#see testbbox function
         if iteration == max_iter:
             checkpointer.save("model_final", **arguments)
-
-
 
     total_training_time = time.time() - start_training_time
     total_time_str = str(datetime.timedelta(seconds=total_training_time))
@@ -268,6 +268,7 @@ def do_da_sw_train(
     model.train()
     start_training_time = time.time()
     end = time.time()
+    # checkpoint_period = 1
     for iteration, ((source_images, source_targets, idx1), (target_images, target_targets, idx2)) in enumerate(
             zip(source_data_loader, target_data_loader), start_iter + 1):
         data_time = time.time() - end
@@ -328,6 +329,12 @@ def do_da_sw_train(
                     # print(k,v)
                     writerT.add_scalar(tag=k, scalar_value=v, global_step=iteration)
                     writerT.flush()
+                f1_ths=testResult[0][3]['f_measure']['Thscores'][0]
+                f1_s = testResult[0][3]['f_measure']['max_f_measure'][0]
+                writerT.add_scalar(tag='',scalar_value=f1_ths,global_step=iteration)
+                writerT.add_scalar(tag='f1',scalar_value=f1_s)
+                writerT.add_hparams(dict(cfg.DATASETS), {"AP50": testResult[0][0].results['bbox']['AP50'],'f1':f1_s},global_step=iteration)
+                writerT.flush()
             except:
                 print('Error:testResult is empty!')
             model.train()  # see testbbox function
@@ -336,7 +343,8 @@ def do_da_sw_train(
         if torch.isnan(losses_reduced).any():
             logger.critical('Loss is NaN, exiting...')
             return
-
+    # writerT.add_hparams(dict(cfg.DATASETS), {"AP50": testResult[0][0].results['bbox']['AP50']})
+    # writerT.flush()
     total_training_time = time.time() - start_training_time
     total_time_str = str(datetime.timedelta(seconds=total_training_time))
     logger.info(
